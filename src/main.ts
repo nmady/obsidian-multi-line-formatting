@@ -1,60 +1,124 @@
-import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { 
+  App, Modal, Notice, Plugin, PluginSettingTab, Setting, MarkdownView
+} from 'obsidian';
+
+interface MyPluginSettings {
+	mySetting: string;
+}
+
+const DEFAULT_SETTINGS: MyPluginSettings = {
+	mySetting: 'default'
+}
 
 export default class MyPlugin extends Plugin {
-  // This field stores your plugin settings.
-  setting: MyPluginSettings;
+	settings: MyPluginSettings;
 
-  onInit() {}
+	async onload() {
+		console.log('loading plugin');
 
-  async onload() {
-    console.log("Plugin is Loading...");
+		await this.loadSettings();
 
-    // This snippet of code is used to load pluging settings from disk (if any)
-    // and then add the setting tab in the Obsidian Settings panel.
-    // If your plugin does not use settings, you can delete these two lines.
-    this.setting = (await this.loadData()) || {
-      someConfigData: 1,
-      anotherConfigData: "defaultValue",
-    };
-    this.addSettingTab(new MyPluginSettingsTab(this.app, this));
+		this.addRibbonIcon('dice', 'Sample Plugin', () => {
+			new Notice('This is a notice!');
+		});
+
+		this.addStatusBarItem().setText('Incremental Test 2');
+
+		this.addCommand({
+			id: 'multi-line-highlight',
+			name: 'Highlight, even over multiple lines',
+			callback: () => {
+				console.log('Simple Callback');
+			},
+			checkCallback: (checking: boolean) => {
+				let leaf = this.app.workspace.activeLeaf;
+				if (leaf) {
+					if (!checking) {
+						new SampleModal(this.app).open();
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+
+		this.addSettingTab(new SampleSettingTab(this.app, this));
+
+		this.registerCodeMirror((cm: CodeMirror.Editor) => {
+			console.log('codemirror', cm);
+		});
+
+		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+			console.log('click', evt);
+		});
+
+		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+	}
+
+	onunload() {
+		console.log('unloading plugin');
+	}
+
+  editModeGuard(command: () => any): void {
+    const mdView = this.app.workspace.activeLeaf.view as MarkdownView;
+    if(!mdView || mdView.getMode() !== 'source') {
+      new Notification('Please use Incremental plugin in edit mode');
+      return;
+    } else {
+      command();
+    }
   }
 
-  onunload() {
-    console.log("Plugin is Unloading...");
-  }
+	async loadSettings() {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
+	}
 }
 
-/**
- * This is a data class that contains your plugin configurations. You can edit it
- * as you wish by adding fields and all the data you need.
- */
-interface MyPluginSettings {
-  someConfigData: number;
-  anotherConfigData: string;
+class SampleModal extends Modal {
+	constructor(app: App) {
+		super(app);
+	}
+
+	onOpen() {
+		let {contentEl} = this;
+		contentEl.setText('Woah!');
+	}
+
+	onClose() {
+		let {contentEl} = this;
+		contentEl.empty();
+	}
 }
 
-class MyPluginSettingsTab extends PluginSettingTab {
-  plugin: MyPlugin;
+class SampleSettingTab extends PluginSettingTab {
+	plugin: MyPlugin;
 
-  constructor(app: App, plugin: MyPlugin) {
-    super(app, plugin);
-    this.plugin = plugin;
-  }
+	constructor(app: App, plugin: MyPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
 
-  display(): void {
-    const { containerEl } = this;
-    const settings = this.plugin.setting;
-    // This is just an example of a setting controll.
-    new Setting(containerEl)
-      .setName("Setting Name")
-      .setDesc("Setting description")
-      .addText((text) =>
-        text.setValue(String(settings.someConfigData)).onChange((value) => {
-          if (!isNaN(Number(value))) {
-            settings.someConfigData = Number(value);
-            this.plugin.saveData(settings);
-          }
-        })
-      );
-  }
+	display(): void {
+		let {containerEl} = this;
+
+		containerEl.empty();
+
+		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
+
+		new Setting(containerEl)
+			.setName('Setting #1')
+			.setDesc('It\'s a secret')
+			.addText(text => text
+				.setPlaceholder('Enter your secret')
+				.setValue('')
+				.onChange(async (value) => {
+					console.log('Secret: ' + value);
+					this.plugin.settings.mySetting = value;
+					await this.plugin.saveSettings();
+				}));
+	}
 }

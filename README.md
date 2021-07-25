@@ -27,3 +27,8 @@ npm run build
 ```
 
 This will create a `main.js` file in the project root. That is the entry point of your plugin.
+
+## Planned features:
+
+- Setting: add colour-picker options for note and cloze-deletion annotations.
+- Setting: On/off switch for "You didn't engage! reminder"
