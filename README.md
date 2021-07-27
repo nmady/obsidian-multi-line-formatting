@@ -1,34 +1,17 @@
-## Obsidian Plugin Template
+## Obsidian Multi-line Formatting Plugin 
 
-This templates includes a barebone directory structure for an Obsidian Plugin. Bundling is based on [Rollup.js](https://rollupjs.org/).
+This plugin is designed to offer formatting over an entire selection, even if that selection has paragraph breaks in the middle! 
 
-**NOTE:** This is not the official template. You can find [the official sample plugin here](https://github.com/obsidianmd/obsidian-sample-plugin). This is a plugin template I customized with a nicer (for me) directory structure and some additional tool (like featuring automatic releases with Github's Actions).
+## Usage
 
-## How to use it
+Choose the formatting you want to apply in Settings. The default is HTML highlighting (using span tags), since sometimes one colour just won't cut it.
 
-You can click on the "Use this template" button above.
+Select the text you want to format, and use the command **Format, even over multiple lines**
 
-### Enable Github's Actions
+## Bug reports and feature requests welcome!
 
-After you created a new repository, remember to rename the `RENAME.github` to `.github` to enable the GitHub's Actions. Then go in `.github/workflows/release.yml` and change `PLUGIN_NAME` on line 10.
+Please let me know how this plugin can be improved.
 
-## How to compile the plugin
+### Acknowledgements
 
-First, install the dependencies with
-
-```bash
-npm i
-```
-
-Then, you can compile the plugin with:
-
-```bash
-npm run build
-```
-
-This will create a `main.js` file in the project root. That is the entry point of your plugin.
-
-## Planned features:
-
-- Setting: add colour-picker options for note and cloze-deletion annotations.
-- Setting: On/off switch for "You didn't engage! reminder"
+A huge thank you to **lynchjames**, whose [Note Refactor Plugin](https://github.com/lynchjames/note-refactor-obsidian) formed the base for this plugin, and to **THeK3nger** for the [Obsidian Plugin Template](https://github.com/THeK3nger/obsidian-plugin-template), and to [roshanshariff](https://github.com/roshanshariff) for help debugging when my newbieness to TypeScript got the best of me.

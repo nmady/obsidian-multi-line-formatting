@@ -1,7 +1,7 @@
 import { 
   App, Modal, Plugin, PluginSettingTab, Setting, MarkdownView
 } from 'obsidian';
-import NRDoc, { ReplaceMode } from './doc';
+import NRDoc from './doc';
 
 const PLUGIN_NAME = "Multi-line Formatting"
 
@@ -110,22 +110,6 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Check it out, a modal!');
-	}
-
-	onClose() {
-		let {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
 class SampleSettingTab extends PluginSettingTab {
 	plugin: MyPlugin;
 
@@ -139,7 +123,7 @@ class SampleSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for Multi-line Formatting.'});
+		containerEl.createEl('h2', {text: 'Settings for ' + PLUGIN_NAME + '.'});
 
 		new Setting(containerEl)
 			.setName('Left')
