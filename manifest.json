@@ -1,7 +1,7 @@
 {
-  "id": "your-obsidian-plugin",
-  "name": "Obsidian Plugin Template",
-  "description": "A Simple Template for Plugins",
+  "id": "multi-line-formatting",
+  "name": "Multi-line Formatting",
+  "description": "Apply formatting to selected text, dealing with the paragraph breaks.",
   "isDesktopOnly": false,
   "js": "main.js"
 }
