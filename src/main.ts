@@ -36,15 +36,6 @@ export default class MyPlugin extends Plugin {
 
 		this.addSettingTab(new SampleSettingTab(this.app, this));
 
-		this.registerCodeMirror((cm: CodeMirror.Editor) => {
-			console.log('codemirror', cm);
-		});
-
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
 	onunload() {
@@ -67,7 +58,6 @@ export default class MyPlugin extends Plugin {
     if(!mdView) {return}
     
     const selectedContent = this.NRDoc.selectedContent(doc);
-    console.log(selectedContent)
     if(selectedContent.length <= 0) { 
       return 
     }
@@ -79,10 +69,10 @@ export default class MyPlugin extends Plugin {
     }
     for (var i = 0; i < selectedContent.length; i++) {
       if(selectedContent[i] === ""){
-        if(i > 0){
+        if(i > 0 && newContent[i-1] != ""){
           newContent[i-1] = newContent[i-1].concat(this.settings.rightStyle);
         }
-        if(i+1<selectedContent.length){
+        if(i+1<selectedContent.length && newContent[i+1] != ""){
           newContent[i+1] = styling.concat(selectedContent[i+1])
         }
       }
@@ -90,7 +80,6 @@ export default class MyPlugin extends Plugin {
     if (newContent[selectedContent.length-1] != ""){
       newContent[selectedContent.length-1] = newContent[selectedContent.length-1].concat('</span>')
     }
-    console.log(newContent)
 
     var catContent:string = ""
     for (var i = 0; i < newContent.length-1; i++){
@@ -132,7 +121,6 @@ class SampleSettingTab extends PluginSettingTab {
 				.setPlaceholder('')
 				.setValue(this.plugin.settings.leftStyle)
 				.onChange(async (value) => {
-					console.log('Secret: ' + value);
 					this.plugin.settings.leftStyle = value;
 					await this.plugin.saveSettings();
 				}));
@@ -144,7 +132,6 @@ class SampleSettingTab extends PluginSettingTab {
         .setPlaceholder('')
         .setValue(this.plugin.settings.rightStyle)
         .onChange(async (value) => {
-          console.log('Secret2: ' + value);
           this.plugin.settings.rightStyle = value;
           await this.plugin.saveSettings();
         }));
