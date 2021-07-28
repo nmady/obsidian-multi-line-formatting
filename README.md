@@ -8,6 +8,10 @@ Choose the formatting you want to apply in Settings. The default is HTML highlig
 
 Select the text you want to format, and use the command **Format, even over multiple lines**
 
+## Limitations
+
+This plugin was designed for formatting multiple lines of plain text. It will not play nicely with headings, lists, blockquotes, codeblocks, etc. Perhaps in the future it will, but for now, if you try to use it over other forms of markdown formatting, you will likely have to do some repair-work to move the formatting symbols to the correct places.
+
 ## Bug reports and feature requests welcome!
 
 Please let me know how this plugin can be improved.

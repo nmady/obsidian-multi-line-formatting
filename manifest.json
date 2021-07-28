@@ -3,5 +3,6 @@
   "name": "Multi-line Formatting",
   "description": "Apply formatting to selected text, dealing with the paragraph breaks.",
   "isDesktopOnly": false,
-  "js": "main.js"
+  "js": "main.js",
+  "version": "0.1.2"
 }
