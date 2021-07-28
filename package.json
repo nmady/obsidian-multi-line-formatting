@@ -1,8 +1,8 @@
 {
-  "name": "your-obsidian-plugin",
-  "author": "Your Name <your@email.com",
-  "version": "0.0.1",
-  "description": "Describe your plugin",
+  "name": "multi-line-formatting",
+  "author": "nmady",
+  "version": "0.1",
+  "description": "Apply formatting to selected text, dealing with the paragraph breaks.",
   "main": "main.js",
   "scripts": {
     "dev": "rollup --config rollup.config.js -w",

@@ -5,18 +5,18 @@ import NRDoc from './doc';
 
 const PLUGIN_NAME = "Multi-line Formatting"
 
-interface MyPluginSettings {
+interface MultilineFormattingPluginSettings {
 	leftStyle: string;
   rightStyle: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
+const DEFAULT_SETTINGS: MultilineFormattingPluginSettings = {
 	leftStyle: '<span style="background-color:#00FEFE">',
   rightStyle: '</span>'
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class MultilineFormattingPlugin extends Plugin {
+	settings: MultilineFormattingPluginSettings;
   NRDoc: NRDoc;
 
 	async onload() {
@@ -34,7 +34,7 @@ export default class MyPlugin extends Plugin {
 			}
 		});
 
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new MultilineFormattingSettingTab(this.app, this));
 
 	}
 
@@ -63,29 +63,28 @@ export default class MyPlugin extends Plugin {
     }
 
     const styling = this.settings.leftStyle
-    var newContent:string[] = selectedContent;
-    if (newContent[0] != ""){
-      newContent[0] = styling.concat(selectedContent[0]); 
+    if (selectedContent[0] != ""){
+      selectedContent[0] = styling.concat(selectedContent[0]); 
     }
     for (var i = 0; i < selectedContent.length; i++) {
       if(selectedContent[i] === ""){
-        if(i > 0 && newContent[i-1] != ""){
-          newContent[i-1] = newContent[i-1].concat(this.settings.rightStyle);
+        if(i > 0 && selectedContent[i-1] != ""){
+          selectedContent[i-1] = selectedContent[i-1].concat(this.settings.rightStyle);
         }
-        if(i+1<selectedContent.length && newContent[i+1] != ""){
-          newContent[i+1] = styling.concat(selectedContent[i+1])
+        if(i+1<selectedContent.length && selectedContent[i+1] != ""){
+          selectedContent[i+1] = styling.concat(selectedContent[i+1])
         }
       }
     }
-    if (newContent[selectedContent.length-1] != ""){
-      newContent[selectedContent.length-1] = newContent[selectedContent.length-1].concat('</span>')
+    if (selectedContent[selectedContent.length-1] != ""){
+      selectedContent[selectedContent.length-1] = selectedContent[selectedContent.length-1].concat(this.settings.rightStyle)
     }
 
     var catContent:string = ""
-    for (var i = 0; i < newContent.length-1; i++){
-      catContent = catContent.concat(newContent[i], '\n')
+    for (var i = 0; i < selectedContent.length-1; i++){
+      catContent = catContent.concat(selectedContent[i], '\n')
     }
-    catContent = catContent.concat(newContent[newContent.length-1])
+    catContent = catContent.concat(selectedContent[selectedContent.length-1])
     doc.replaceSelection("".concat(catContent));
 
   }
@@ -99,10 +98,10 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+class MultilineFormattingSettingTab extends PluginSettingTab {
+	plugin: MultilineFormattingPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: MultilineFormattingPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
