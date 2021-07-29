@@ -10,9 +10,7 @@ Select the text you want to format, and use the command **Format, even over mult
 
 ## Limitations
 
-This plugin was designed for formatting multiple lines of plain text. It will not play nicely with headings, lists, blockquotes, codeblocks, etc. Perhaps in the future it will, but for now, if you try to use it over other forms of markdown formatting, you will likely have to do some repair-work to move the formatting symbols to the correct places.
-
-## Bug reports and feature requests welcome!
+This plugin currently skips over list items, but should work for paragraphs and headings. **Bug reports and feature requests appreciated!**
 
 Please let me know how this plugin can be improved.
 

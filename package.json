@@ -1,7 +1,7 @@
 {
   "name": "multi-line-formatting",
   "author": "nmady",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Apply formatting to selected text, dealing with the paragraph breaks.",
   "main": "main.js",
   "scripts": {
