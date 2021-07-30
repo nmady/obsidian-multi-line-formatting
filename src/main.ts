@@ -1,8 +1,6 @@
-import { assert } from 'console';
 import { 
   App, Plugin, PluginSettingTab, Setting, MarkdownView, CacheItem, EditorPosition, ListItemCache, HeadingCache
 } from 'obsidian';
-import { start } from 'repl';
 import NRDoc from './doc';
 
 const PLUGIN_NAME = "Multi-line Formatting"
@@ -63,6 +61,7 @@ export default class MultilineFormattingPlugin extends Plugin {
     const mdView = this.app.workspace.activeLeaf.view as MarkdownView;
     if(!mdView) {return}
     const doc = mdView.editor;
+
     const cache = this.app.metadataCache.getCache(mdView.file.path)
     const sections = cache.sections
     const headings = cache.headings
@@ -76,11 +75,25 @@ export default class MultilineFormattingPlugin extends Plugin {
     console.log('ListItems', listItems)
     console.log('Original selectedContent:', selectedContent)
 
+    /* We're going to apply the rightStyle at the very end because sometimes
+      headers close a block unexpectedly, in which case have to look to the block
+      preceding and apply the rightStyle after the initial loop through.
+      applyRightArray[i] == true means we apply rightStyle to selectedContent[i] */
     var applyRightArray: boolean[] = new Array(selectedContent.length)
     applyRightArray.fill(false);
+
+    /* If there is no text in the line to format (empty line or only heading/list
+       prefix) then we don't want to append the rightStyle after the fact*/
     var isFormatEmpty: boolean[] = new Array(selectedContent.length)
     isFormatEmpty.fill(false);
+    
+    /* The next (non-empty) line after a heading embedded in a list needs 
+      leftStyle applied. */
     var isAfterListHeading = false
+
+    /* Reset applyLeft to false after each iteration. This variable lets us set
+     a 'left' edge between a heading/list prefix, and only apply formatting to
+     lines where there is selected content to the right of that left edge. */ 
     var applyLeft = false
 
     const selectionStartCursor = doc.getCursor('from');
@@ -99,6 +112,7 @@ export default class MultilineFormattingPlugin extends Plugin {
       console.log("Lineno:", line, "Section:", j)
       var originalLine = doc.getLine(line)
       console.log("Full line:", originalLine)
+      var left = 0
 
       if (sections[j].position.end.line < line){
         j++;
@@ -109,9 +123,9 @@ export default class MultilineFormattingPlugin extends Plugin {
         if (!isFormatEmpty[i]){
           var trimmed = selectedContent[i].trim()
           selectedContent[i] = selectedContent[i].replace(trimmed, this.settings.leftStyle.concat(trimmed))
+          /* jump to the end of the paragraph */
           i = i + (sections[j].position.end.line - line);
           line = i + selectionStartCursor.line;
-          console.log(selectedContent, i, sections[j].position.end.line, line);
           applyRightArray[i] = true
         }
       } else if (sections[j].type === "heading") {
@@ -119,14 +133,14 @@ export default class MultilineFormattingPlugin extends Plugin {
         if (this.settings.skipHeadings) {
           isFormatEmpty[i] = true;
           console.log('skipping Heading')
-        } else {
-          var text = headings[sectionBinarySearch(line, headings)].heading
-          console.log(text)
-          left = originalLine.lastIndexOf(text)
-          if (left > 0) applyLeft = true;
-          console.log('left in heading:', left)
-          applyRightArray[i] = true
-        }
+          continue
+        } 
+        var text = headings[sectionBinarySearch(line, headings)].heading
+        console.log(text)
+        left = originalLine.lastIndexOf(text)
+        if (left > 0) applyLeft = true;
+        console.log('left in heading:', left)
+        applyRightArray[i] = true
       } else if (sections[j].type === "list") {
         console.log("list")
         if (this.settings.skipListItems) {
@@ -143,10 +157,9 @@ export default class MultilineFormattingPlugin extends Plugin {
         } else applyLeft = false
 
         var listIndex = sectionBinarySearch(line, listItems)
-        var originalLine = doc.getLine(line)
-        var texttrimmed = originalLine
-        var selectionStartCol = originalLine.lastIndexOf(selectedContent[i])
-        var left = 0
+        // var originalLine = doc.getLine(line)
+        var lineTrimmed = originalLine
+        // var selectionStartCol = originalLine.lastIndexOf(selectedContent[i])
         var listItem = listItems[listIndex]
         console.log('item ', listIndex, 'found via binary search', listItem)
         /* if this is the first line of the ListItem */
@@ -168,23 +181,23 @@ export default class MultilineFormattingPlugin extends Plugin {
             left = listItems[listIndex].position.start.col
             console.log('left:', left)
             var subLine = originalLine.substring(left)
-            var texttrimmed: string;
+            var lineTrimmed: string;
             var startUntrimmed: number;
             console.log(subLine)
             if (typeof(listItem.task) != 'undefined') {
               startUntrimmed = subLine.indexOf(listItem.task.concat(']')) + 2
               left += startUntrimmed
               subLine = originalLine.substring(left)
-              texttrimmed = subLine.trimStart()
-              left += subLine.length - texttrimmed.length
+              lineTrimmed = subLine.trimStart()
+              left += subLine.length - lineTrimmed.length
               console.log('text,' + subLine)
               console.log('left,', left)
             } else {
               /* Taskless list items may start with whitespace*/
-              texttrimmed = subLine.trimStart()
+              lineTrimmed = subLine.trimStart()
               /* But after the whitespace, there should be a *, -, or 1., then more whitespace*/
-              texttrimmed = texttrimmed.substring(texttrimmed.search(/\s/)).trimStart()
-              left += subLine.length - texttrimmed.length
+              lineTrimmed = lineTrimmed.substring(lineTrimmed.search(/\s/)).trimStart()
+              left += subLine.length - lineTrimmed.length
               console.log('left after removing prefix:', left)
             }
             
@@ -192,14 +205,14 @@ export default class MultilineFormattingPlugin extends Plugin {
               listIndex++;
               console.log('listIndex', listIndex)
             } else {
-              console.log(texttrimmed)
+              console.log(lineTrimmed)
               break
             }
           }
         } else {
           console.log('not first line')
-          texttrimmed = originalLine.trimStart()
-          left = originalLine.length - texttrimmed.length;
+          lineTrimmed = originalLine.trimStart()
+          left = originalLine.length - lineTrimmed.length;
         }
         if (originalLine.substring(left).search(/#{1,6}\s/) == 0) {
           console.log("This is a heading inside a list.")
@@ -207,9 +220,9 @@ export default class MultilineFormattingPlugin extends Plugin {
           applyRightArray[i] = true;
           if (i - 1 >= 0) applyRightArray[i-1] = true;
           isAfterListHeading = true;
-          subLine = texttrimmed
-          texttrimmed = texttrimmed.substring(texttrimmed.search(/\s/)).trimStart()
-          left += subLine.length - texttrimmed.length
+          subLine = lineTrimmed
+          lineTrimmed = lineTrimmed.substring(lineTrimmed.search(/\s/)).trimStart()
+          left += subLine.length - lineTrimmed.length
           console.log('left', left)
         }
 
@@ -248,68 +261,6 @@ export default class MultilineFormattingPlugin extends Plugin {
       }
     }
 
-    // console.log(doc.getCursor('from'));
-    // const selectionEndCursor = doc.getCursor('to')
-    // console.log(doc.getCursor('to'))
-
-    /* Dealing with the first line
-
-      The first line may be 
-        empty => nothing to do here
-        start in or at the beginning of the text => add left formatting at start
-        start at the beginning or in the middle of some start-of-block formatting
-            => go to the beginning of the text and add left formatting */
-
-    // console.log(sections)
-    // const indexEnd = sectionBinarySearch(selectionEndCursor,sections)
-    // console.log(indexStart)
-    // console.log(indexEnd)
-
-    // for(var i = indexStart; i <= indexEnd; i++){
-    //   if (sections[i].type === "paragraph") {
-    //     console.log("This is a paragraph.")
-    //     if (i == indexStart && selectionStartCursor.line >= sections[i].position.start.line){
-    //       console.log("Since we're not starting on a blank line, we should simply append the left formatting where our cursor is.")
-    //       console.log(doc.getLine(selectionStartCursor.line))
-    //       doc.setLine(selectionStartCursor.line, doc.getLine(selectionStartCursor.line).substring(0,selectionStartCursor.ch).concat(this.settings.leftStyle, doc.getLine(selectionStartCursor.line).substring(selectionStartCursor.ch)))
-    //     }
-    //     if (i === indexEnd && sections[i].position.end.line >= selectionEndCursor.line) {
-    //       console.log(sections[i].position.end.line)
-    //       console.log(selectionEndCursor.line)
-    //       console.log("It's the last section and we need to apply right formatting to the end of selection")
-    //       doc.setLine(selectionEndCursor.line, doc.getLine(selectionStartCursor.line).substring(0,selectionEndCursor.ch).concat('</test>', doc.getLine(selectionEndCursor.line).substring(selectionEndCursor.ch)))
-    //     }
-    //   }
-
-    //   if (sections[i].position.end.line < selectionEndCursor.line){
-    //     doc.setLine(sections[i].position.end.line, doc.getLine(sections[i].position.end.line).concat(this.settings.rightStyle))
-    //   } else if (i == indexEnd) {
-    //     console.log("We need to make sure the end cursor isn't in the middle of some formatting, and if it isn't, we can append right formatting?")
-    //   }
-    // }
-    
-
-    // console.log(doc.getLine(selectionStartCursor.line))
-
-
-
-    // if (selectedContent[0] != ""){
-    //   selectedContent[0] = this.settings.leftStyle.concat(selectedContent[0]); 
-    // }
-    // for (var i = 0; i < selectedContent.length; i++) {
-    //   if(selectedContent[i] === ""){
-    //     if(i > 0 && selectedContent[i-1] != ""){
-    //       selectedContent[i-1] = selectedContent[i-1].concat(this.settings.rightStyle);
-    //     }
-    //     if(i+1<selectedContent.length && selectedContent[i+1] != ""){
-    //       selectedContent[i+1] = this.settings.leftStyle.concat(selectedContent[i+1])
-    //     }
-    //   }
-    // }
-    // if (selectedContent[selectedContent.length-1] != ""){
-    //   selectedContent[selectedContent.length-1] = selectedContent[selectedContent.length-1].concat(this.settings.rightStyle)
-    // }
-
     var catContent:string = ""
     for (var i = 0; i < selectedContent.length-1; i++){
       catContent = catContent.concat(selectedContent[i], '\n')
@@ -335,13 +286,13 @@ function sectionBinarySearch(line: number, sections: CacheItem[]): number {
     var midpoint = (low+high) >> 1
     var midposition = sections[midpoint].position
     if (line < midposition.start.line){
-      // cursor before middle section
+      /* cursor before middle section */
       high = midpoint - 1
     } else if (line <= midposition.end.line){
-      // cursor in middle section
+      /* cursor in middle section */
       return midpoint
     } else {
-      // cursor after middle section
+      /* cursor after middle section */
       low = midpoint + 1
     }
   }
