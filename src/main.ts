@@ -75,7 +75,8 @@ export default class MultilineFormattingPlugin extends Plugin {
     if(selectedContent.length <= 0) { 
       return 
     }
-
+    console.log('This is updated')
+    console.log('Sections', sections)
     console.log('ListItems', listItems)
     console.log('Original selectedContent:', selectedContent)
 
@@ -83,77 +84,87 @@ export default class MultilineFormattingPlugin extends Plugin {
       headers close a block unexpectedly, in which case have to look to the block
       preceding and apply the rightStyle after the initial loop through.
       applyRightArray[i] == true means we apply rightStyle to selectedContent[i] */
-    var applyRightArray: boolean[] = new Array(selectedContent.length)
+    const applyRightArray: boolean[] = new Array(selectedContent.length)
     applyRightArray.fill(false);
 
     /* If there is no text in the line to format (empty line or only heading/list
        prefix) then we don't want to append the rightStyle after the fact*/
-    var isFormatEmpty: boolean[] = new Array(selectedContent.length)
+    const isFormatEmpty: boolean[] = new Array(selectedContent.length)
     isFormatEmpty.fill(false);
     
     /* The next (non-empty) line after a heading embedded in a list needs 
       leftStyle applied. */
-    var isAfterEmbeddedHeading = false
-
-    /* Reset applyLeft to false after each iteration. This variable lets us set
-     a 'left' edge between a heading/list prefix, and only apply formatting to
-     lines where there is selected content to the right of that left edge. */ 
-    var applyLeft = false
+    let isAfterEmbeddedHeading = false
 
     const selectionStartCursor = doc.getCursor('from');
-    const indexStart = sectionBinarySearch(selectionStartCursor.line, sections)
-    var selectionStartCol = selectionStartCursor.ch
 
-    var j = indexStart;
-    for (var i=0; i < selectedContent.length; i++) {
+    let currentSectionIndex = sectionBinarySearch(selectionStartCursor.line, sections);
+
+    for (let i=0; i < selectedContent.length; i++) {
       console.log('Starting line', i, 'now, with content:', selectedContent[i])
-      if (i > 0) selectionStartCol = 0
+      /* Reset applyLeft to false after each iteration. This variable lets us set
+      a 'left' edge between a heading/list prefix, and only apply formatting to
+      lines where there is selected content to the right of that left edge. */ 
+      let applyLeft = false
+
+      const selectionStartCol = (i > 0) ? 0 : selectionStartCursor.ch  
+
       if (selectedContent[i] === ""){
         isFormatEmpty[i] = true;
         console.log("empty line:", isFormatEmpty)
       }
-      var line = i + selectionStartCursor.line
-      console.log("Lineno:", line, "Section:", j)
-      var originalLine = doc.getLine(line)
+      const lineNo = i + selectionStartCursor.line
+      console.log("Lineno:", lineNo, "Section:", currentSectionIndex)
+      const originalLine = doc.getLine(lineNo)
       console.log("Full line:", originalLine)
-      var left = 0
+      let left = 0
 
-      if (sections[j].position.end.line < line){
-        j++;
+      if (sections[currentSectionIndex].position.end.line < lineNo){
+        currentSectionIndex++;
       }
 
-      if (sections[j].type === "paragraph") {
+      if (sections[currentSectionIndex].type === "paragraph") {
         console.log("paragraph")
         if (!isFormatEmpty[i]){
           var trimmed = selectedContent[i].trim()
           selectedContent[i] = selectedContent[i].replace(trimmed, this.settings.leftStyle.concat(trimmed))
           /* jump to the end of the paragraph */
-          i = i + (sections[j].position.end.line - line);
-          line = i + selectionStartCursor.line;
+          i = sections[currentSectionIndex].position.end.line - selectionStartCursor.line
+          console.log('i', i)
+          // lineNo = i + selectionStartCursor.line;
           applyRightArray[i] = true
         }
-      } else if (sections[j].type === "heading") {
+      } else if (sections[currentSectionIndex].type === "heading") {
         console.log("heading");
         if (this.settings.skipHeadings) {
           isFormatEmpty[i] = true;
           console.log('skipping Heading')
           continue
         } 
-        var text = headings[sectionBinarySearch(line, headings)].heading
+        var text = headings[sectionBinarySearch(lineNo, headings)].heading
         console.log(text)
         left = originalLine.lastIndexOf(text)
         if (left > 0) applyLeft = true;
         console.log('left in heading:', left)
         applyRightArray[i] = true
-      } else if (sections[j].type === "blockquote") {
+      } else if (sections[currentSectionIndex].type === "blockquote") {
         console.log("blockquote")
         if (this.settings.skipBlockquotes) {
           isFormatEmpty[i] = true;
           console.log('skipping Blockquote')
           continue
         }
+        /* if this is the first line of the Blockquote */
+        if (sections[currentSectionIndex].position.start.line == lineNo) applyLeft = true
 
-      } else if (sections[j].type === "list") {
+        /* The prefix for a blockquote is some combination of whitespace and >*/
+        const blockquoteRegex: RegExp = /^[\s>]*/g
+        const prefix = blockquoteRegex.exec(originalLine)[0];
+        console.log('bq-level:', prefix.split('>').length-1)
+        left = prefix.length
+        console.log('left after removing prefix:', left)
+        if (sections[currentSectionIndex].position.end.line == lineNo) applyRightArray[i] = true
+      } else if (sections[currentSectionIndex].type === "list") {
         console.log("list")
         if (this.settings.skipListItems) {
           isFormatEmpty[i] = true;
@@ -168,20 +179,18 @@ export default class MultilineFormattingPlugin extends Plugin {
           }
         } else applyLeft = false
 
-        var listIndex = sectionBinarySearch(line, listItems)
-        // var originalLine = doc.getLine(line)
-        var lineTrimmed = originalLine
-        // var selectionStartCol = originalLine.lastIndexOf(selectedContent[i])
-        var listItem = listItems[listIndex]
+        let listIndex = sectionBinarySearch(lineNo, listItems)
+        const lineTrimmed = originalLine
+        const listItem = listItems[listIndex]
         console.log('item ', listIndex, 'found via binary search', listItem)
         /* if this is the first line of the ListItem */
-        if (listItem.position.start.line == line){
+        if (listItem.position.start.line == lineNo){
           applyLeft = true
           while (listItems[listIndex].position.start.col > selectionStartCol) {
             console.log("List item starts in col", listItems[listIndex].position.start.col, " which is to the right of where the selection starts,", selectionStartCol, "so the selection is probably in the preceding list item.")
             listIndex--;
           }
-          while (listIndex+1 < listItems.length && listItems[listIndex+1].position.start.line === line && listItems[listIndex+1].position.start.col < selectionStartCol) {
+          while (listIndex+1 < listItems.length && listItems[listIndex+1].position.start.line === lineNo && listItems[listIndex+1].position.start.col < selectionStartCol) {
             console.log("The start of the selected part of this line seems to be after the start of the next list item.")
             console.log("liststart", listItems[listIndex].position.start.col)
             console.log("selectionStart", selectionStartCol)
@@ -189,31 +198,28 @@ export default class MultilineFormattingPlugin extends Plugin {
           }
           while (true) {
             console.log('listIndex', listIndex)
-            listItem = listItems[listIndex]
+            const listItem = listItems[listIndex]
             left = listItems[listIndex].position.start.col
             console.log('left:', left)
-            var subLine = originalLine.substring(left)
-            var lineTrimmed: string;
-            var startUntrimmed: number;
-            console.log(subLine)
+            // let subLine = originalLine.substring(left)
             if (typeof(listItem.task) != 'undefined') {
-              startUntrimmed = subLine.indexOf(listItem.task.concat(']')) + 2
+              /* List item with a task */
+              const startUntrimmed = originalLine.substring(left).indexOf(listItem.task.concat(']')) + 2
               left += startUntrimmed
-              subLine = originalLine.substring(left)
-              lineTrimmed = subLine.trimStart()
-              left += subLine.length - lineTrimmed.length
+              const subLine = originalLine.substring(left)
+              const subLineTrimmed = subLine.trimStart()
+              left += subLine.length - subLineTrimmed.length
               console.log('text,' + subLine)
               console.log('left,', left)
             } else {
-              /* Taskless list items may start with whitespace*/
-              lineTrimmed = subLine.trimStart()
-              /* But after the whitespace, there should be a *, -, or 1., then more whitespace*/
-              lineTrimmed = lineTrimmed.substring(lineTrimmed.search(/\s/)).trimStart()
-              left += subLine.length - lineTrimmed.length
+              /* Taskless list items */
+              const prefix = originalLine.substring(left).match(/^\s*(\*|-|\d+\.)\s*/)[0]
+              console.log('prefix:', prefix)
+              left += prefix.length
               console.log('left after removing prefix:', left)
             }
             
-            if (listIndex + 1 < listItems.length && listItems[listIndex + 1].position.start.line === line && listItems[listIndex + 1].position.start.col <= left){
+            if (listIndex + 1 < listItems.length && listItems[listIndex + 1].position.start.line === lineNo && listItems[listIndex + 1].position.start.col <= left){
               listIndex++;
               console.log('listIndex', listIndex)
             } else {
@@ -223,32 +229,34 @@ export default class MultilineFormattingPlugin extends Plugin {
           }
         } else {
           console.log('not first line')
-          lineTrimmed = originalLine.trimStart()
-          left = originalLine.length - lineTrimmed.length;
+          left = originalLine.length - originalLine.trimStart().length;
         }
-        if (originalLine.substring(left).search(/#{1,6}\s/) == 0) {
+        const headingMatch = originalLine.substring(left).match(/^\s*#{1,6}\s+/)
+        if (headingMatch != null) {
           console.log("This is a heading inside a list.")
           applyLeft = true;
           applyRightArray[i] = true;
           if (i - 1 >= 0) applyRightArray[i-1] = true;
           isAfterEmbeddedHeading = true;
-          subLine = lineTrimmed
-          lineTrimmed = lineTrimmed.substring(lineTrimmed.search(/\s/)).trimStart()
-          left += subLine.length - lineTrimmed.length
+          left += headingMatch[0].length
           console.log('left', left)
         }
 
-        if (listItem.position.end.line === line || i == selectedContent.length - 1){
+        if (listItem.position.end.line === lineNo || i == selectedContent.length - 1){
           console.log("end of block or selection")
           if (isFormatEmpty[i]) {
             console.log("isFormatEmpty")
-            for (var k = i; isFormatEmpty[k] && k >= 0; k--) {console.log('k:', k)}
+            let k = i;
+            while (k >= 0 && isFormatEmpty[k]) {
+              k--;
+              console.log('k:', k)
+            }
             if (!isFormatEmpty[k]) {applyRightArray[k] = true;}
           } else applyRightArray[i] = true
         } else console.log("Not end of block.")
   
       } else {
-        console.log("not sure what this is", sections[j].type)
+        console.log("not sure what this is", sections[currentSectionIndex].type)
       }
       console.log("Time to applyLeft")
       if (applyLeft) {
@@ -256,7 +264,7 @@ export default class MultilineFormattingPlugin extends Plugin {
         if (left <= selectionStartCol) {
           selectedContent[i] = this.settings.leftStyle.concat(selectedContent[i])
         } else {
-          var formatable = selectedContent[i].substring(left - selectionStartCol)
+          const formatable = selectedContent[i].substring(left - selectionStartCol)
           if (formatable === "") {
             isFormatEmpty[i] = true;
             continue
@@ -267,18 +275,13 @@ export default class MultilineFormattingPlugin extends Plugin {
     applyLeft = false
     } /* end for loop over all lines of selectedContent indexed by i */
 
-    for (var i=0; i<selectedContent.length; i++) {
+    for (let i=0; i<selectedContent.length; i++) {
       if (applyRightArray[i] && !isFormatEmpty[i]) {
         selectedContent[i] = selectedContent[i].concat(this.settings.rightStyle)
       }
     }
 
-    var catContent:string = ""
-    for (var i = 0; i < selectedContent.length-1; i++){
-      catContent = catContent.concat(selectedContent[i], '\n')
-    }
-    catContent = catContent.concat(selectedContent[selectedContent.length-1])
-    doc.replaceSelection("".concat(catContent));
+    doc.replaceSelection(selectedContent.join('\n'));
 
   }
 
@@ -292,14 +295,16 @@ export default class MultilineFormattingPlugin extends Plugin {
 }
 
 function sectionBinarySearch(line: number, sections: CacheItem[]): number {
-  var low = 0
-  var high = sections.length - 1
+  let low = 0
+  let high = sections.length
   while (low < high){
-    var midpoint = (low+high) >> 1
-    var midposition = sections[midpoint].position
+    const midpoint = low + ((high - low) >> 1)
+    console.log(low, high)
+    console.log(midpoint)
+    const midposition = sections[midpoint].position
     if (line < midposition.start.line){
       /* cursor before middle section */
-      high = midpoint - 1
+      high = midpoint
     } else if (line <= midposition.end.line){
       /* cursor in middle section */
       return midpoint
@@ -326,7 +331,7 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for ' + PLUGIN_NAME + '.'});
+		containerEl.createEl('h2', {text: 'Settings for ' + PLUGIN_NAME});
 
     new Setting(containerEl)
 			.setName('Nickname')
@@ -402,7 +407,7 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
             this.plugin.settings.skipBlockquotes = v;
             await this.plugin.saveSettings();
           })
-          .setDisabled(true)
+          // .setDisabled(true)
         });
 	}
 }
