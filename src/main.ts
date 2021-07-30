@@ -75,8 +75,7 @@ export default class MultilineFormattingPlugin extends Plugin {
     if(selectedContent.length <= 0) { 
       return 
     }
-    console.log('This is updated')
-    console.log('Sections', sections)
+    console.debug('Sections', sections)
     console.log('ListItems', listItems)
     console.log('Original selectedContent:', selectedContent)
 
@@ -119,20 +118,22 @@ export default class MultilineFormattingPlugin extends Plugin {
       console.log("Full line:", originalLine)
       let left = 0
 
-      if (sections[currentSectionIndex].position.end.line < lineNo){
+      while (sections[currentSectionIndex].position.end.line < lineNo){
         currentSectionIndex++;
       }
 
       if (sections[currentSectionIndex].type === "paragraph") {
         console.log("paragraph")
         if (!isFormatEmpty[i]){
-          var trimmed = selectedContent[i].trim()
-          selectedContent[i] = selectedContent[i].replace(trimmed, this.settings.leftStyle.concat(trimmed))
+          const whitespaceMatch = selectedContent[i].match(/^(\s*)(.*)/)
+          console.log(whitespaceMatch)
+          selectedContent[i] = whitespaceMatch[1] + this.settings.leftStyle + whitespaceMatch[2]
           /* jump to the end of the paragraph */
           i = sections[currentSectionIndex].position.end.line - selectionStartCursor.line
           console.log('i', i)
           // lineNo = i + selectionStartCursor.line;
           applyRightArray[i] = true
+          continue
         }
       } else if (sections[currentSectionIndex].type === "heading") {
         console.log("heading");
@@ -141,7 +142,7 @@ export default class MultilineFormattingPlugin extends Plugin {
           console.log('skipping Heading')
           continue
         } 
-        var text = headings[sectionBinarySearch(lineNo, headings)].heading
+        const text = headings[sectionBinarySearch(lineNo, headings)].heading
         console.log(text)
         left = originalLine.lastIndexOf(text)
         if (left > 0) applyLeft = true;
