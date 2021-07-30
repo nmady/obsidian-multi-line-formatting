@@ -6,17 +6,21 @@ import NRDoc from './doc';
 const PLUGIN_NAME = "Multi-line Formatting"
 
 interface MultilineFormattingPluginSettings {
+  nickname: string;
 	leftStyle: string;
   rightStyle: string;
   skipHeadings: boolean;
   skipListItems: boolean;
+  skipBlockquotes: boolean;
 }
 
 const DEFAULT_SETTINGS: MultilineFormattingPluginSettings = {
+  nickname: 'Format, even over multiple lines',
 	leftStyle: '<span style="background-color:#00FEFE">',
   rightStyle: '</span>',
-  skipHeadings: true,
-  skipListItems: true
+  skipHeadings: false,
+  skipListItems: false,
+  skipBlockquotes: true
 }
 
 export default class MultilineFormattingPlugin extends Plugin {
@@ -33,7 +37,7 @@ export default class MultilineFormattingPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'multi-line-format',
-			name: 'Format, even over multiple lines',
+			name: this.settings.nickname,
 			callback: () => {
         this.editModeGuard(async () => await this.formatSelection())
 			}
@@ -89,7 +93,7 @@ export default class MultilineFormattingPlugin extends Plugin {
     
     /* The next (non-empty) line after a heading embedded in a list needs 
       leftStyle applied. */
-    var isAfterListHeading = false
+    var isAfterEmbeddedHeading = false
 
     /* Reset applyLeft to false after each iteration. This variable lets us set
      a 'left' edge between a heading/list prefix, and only apply formatting to
@@ -141,6 +145,14 @@ export default class MultilineFormattingPlugin extends Plugin {
         if (left > 0) applyLeft = true;
         console.log('left in heading:', left)
         applyRightArray[i] = true
+      } else if (sections[j].type === "blockquote") {
+        console.log("blockquote")
+        if (this.settings.skipBlockquotes) {
+          isFormatEmpty[i] = true;
+          console.log('skipping Blockquote')
+          continue
+        }
+
       } else if (sections[j].type === "list") {
         console.log("list")
         if (this.settings.skipListItems) {
@@ -148,11 +160,11 @@ export default class MultilineFormattingPlugin extends Plugin {
           console.log('skipping List Item')
           continue
         } 
-        if (isAfterListHeading) { 
+        if (isAfterEmbeddedHeading) { 
           console.log("line is after list heading")
           if (!isFormatEmpty[i]) {
             applyLeft = true;
-            isAfterListHeading = false;
+            isAfterEmbeddedHeading = false;
           }
         } else applyLeft = false
 
@@ -219,7 +231,7 @@ export default class MultilineFormattingPlugin extends Plugin {
           applyLeft = true;
           applyRightArray[i] = true;
           if (i - 1 >= 0) applyRightArray[i-1] = true;
-          isAfterListHeading = true;
+          isAfterEmbeddedHeading = true;
           subLine = lineTrimmed
           lineTrimmed = lineTrimmed.substring(lineTrimmed.search(/\s/)).trimStart()
           left += subLine.length - lineTrimmed.length
@@ -316,6 +328,17 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
 
 		containerEl.createEl('h2', {text: 'Settings for ' + PLUGIN_NAME + '.'});
 
+    new Setting(containerEl)
+			.setName('Nickname')
+			.setDesc('The name for your formatting command in the command palette.')
+			.addText(text => text
+				// .setPlaceholder('')
+				.setValue(this.plugin.settings.nickname)
+				.onChange(async (value) => {
+					this.plugin.settings.nickname = value;
+					await this.plugin.saveSettings();
+				}));
+
 		new Setting(containerEl)
 			.setName('Left')
 			.setDesc('The opening tag, or the left part of a highlight (==), bold (**), etc.')
@@ -338,9 +361,12 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
-    new Setting(containerEl)
+    const skipDetails: HTMLDetailsElement = containerEl.createEl("details");
+    skipDetails.createEl("summary", { text: "Skip some section types" });
+    
+    new Setting(skipDetails)
       .setName('Skip List Items')
-      .setDesc('Formatting list items is experimental and may include bugs. Turn this toggle OFF to attempt to format them.')
+      .setDesc('Turn this toggle ON to exclude text in list items.')
       .addToggle((t) => {
         t.setValue(this.plugin.settings.skipListItems);
         t.onChange(async (v) => {
@@ -349,15 +375,27 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
         })
       });
     
-    new Setting(containerEl)
+    new Setting(skipDetails)
         .setName('Skip Headings')
-        .setDesc('Formatting headings is experimental and may include bugs. Turn this toggle OFF to attempt to format them.')
+        .setDesc('Turn this toggle ON to exclude text in headings.')
         .addToggle((t) => {
           t.setValue(this.plugin.settings.skipHeadings);
           t.onChange(async (v) => {
             this.plugin.settings.skipHeadings = v;
             await this.plugin.saveSettings();
           })
+        });
+
+    new Setting(skipDetails)
+        .setName('Skip Blockquotes')
+        .setDesc('Turn this toggle ON to exclude text in Blockquotes. (OFF Disabled, since Blockquote formatting in development!)')
+        .addToggle((t) => {
+          t.setValue(this.plugin.settings.skipBlockquotes);
+          t.onChange(async (v) => {
+            this.plugin.settings.skipBlockquotes = v;
+            await this.plugin.saveSettings();
+          })
+          .setDisabled(true)
         });
 	}
 }
