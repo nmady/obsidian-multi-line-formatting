@@ -1,7 +1,8 @@
 import { assert } from 'console';
 import { 
-  App, Plugin, PluginSettingTab, Setting, MarkdownView, CacheItem, EditorPosition
+  App, Plugin, PluginSettingTab, Setting, MarkdownView, CacheItem, EditorPosition, ListItemCache, HeadingCache
 } from 'obsidian';
+import { start } from 'repl';
 import NRDoc from './doc';
 
 const PLUGIN_NAME = "Multi-line Formatting"
@@ -9,11 +10,15 @@ const PLUGIN_NAME = "Multi-line Formatting"
 interface MultilineFormattingPluginSettings {
 	leftStyle: string;
   rightStyle: string;
+  skipHeadings: boolean;
+  skipListItems: boolean;
 }
 
 const DEFAULT_SETTINGS: MultilineFormattingPluginSettings = {
 	leftStyle: '<span style="background-color:#00FEFE">',
-  rightStyle: '</span>'
+  rightStyle: '</span>',
+  skipHeadings: true,
+  skipListItems: true
 }
 
 export default class MultilineFormattingPlugin extends Plugin {
@@ -68,61 +73,184 @@ export default class MultilineFormattingPlugin extends Plugin {
       return 
     }
 
+    console.log('ListItems', listItems)
+    console.log('Original selectedContent:', selectedContent)
+
+    var applyRightArray: boolean[] = new Array(selectedContent.length)
+    applyRightArray.fill(false);
+    var isFormatEmpty: boolean[] = new Array(selectedContent.length)
+    isFormatEmpty.fill(false);
+    var isAfterListHeading = false
+    var applyLeft = false
+
     const selectionStartCursor = doc.getCursor('from');
     const indexStart = sectionBinarySearch(selectionStartCursor.line, sections)
+    var selectionStartCol = selectionStartCursor.ch
 
     var j = indexStart;
     for (var i=0; i < selectedContent.length; i++) {
-      console.log(selectedContent[i], i)
+      console.log('Starting line', i, 'now, with content:', selectedContent[i])
+      if (i > 0) selectionStartCol = 0
       if (selectedContent[i] === ""){
-        console.log("empty line")
-        continue
+        isFormatEmpty[i] = true;
+        console.log("empty line:", isFormatEmpty)
       }
       var line = i + selectionStartCursor.line
-      console.log(line, j)
-      console.log(doc.getLine(line))
+      console.log("Lineno:", line, "Section:", j)
+      var originalLine = doc.getLine(line)
+      console.log("Full line:", originalLine)
 
       if (sections[j].position.end.line < line){
         j++;
       }
 
       if (sections[j].type === "paragraph") {
-        var trimmed = selectedContent[i].trim()
-        selectedContent[i] = selectedContent[i].replace(trimmed, this.settings.leftStyle.concat(trimmed))
-        i = i + (sections[j].position.end.line - line);
-        line = i + selectionStartCursor.line;
-        console.log(selectedContent, i, sections[j].position.end.line, line);
-        selectedContent[i] = selectedContent[i].concat(this.settings.rightStyle);
+        console.log("paragraph")
+        if (!isFormatEmpty[i]){
+          var trimmed = selectedContent[i].trim()
+          selectedContent[i] = selectedContent[i].replace(trimmed, this.settings.leftStyle.concat(trimmed))
+          i = i + (sections[j].position.end.line - line);
+          line = i + selectionStartCursor.line;
+          console.log(selectedContent, i, sections[j].position.end.line, line);
+          applyRightArray[i] = true
+        }
       } else if (sections[j].type === "heading") {
-        console.log("header");
-        var text = headings[sectionBinarySearch(line, headings)].heading
-        console.log(text)
-        if (i != 0 || selectedContent[i].indexOf(text) > selectionStartCursor.ch) {
-          if (selectedContent[i].trim().indexOf(text) < 3){
-            console.log("Not formatting this line because it wouldn't show up anyways.")
-            continue
-          }
-          selectedContent[i] = selectedContent[i].replace(text, this.settings.leftStyle.concat(text)).concat(this.settings.rightStyle)
+        console.log("heading");
+        if (this.settings.skipHeadings) {
+          isFormatEmpty[i] = true;
+          console.log('skipping Heading')
         } else {
-          console.log(selectedContent[i])
-          console.log(selectedContent[i].substring(0, selectionStartCursor.ch), 
-            this.settings.leftStyle, 
-            selectedContent[i].substring(selectionStartCursor.ch), 
-            this.settings.rightStyle)
-          selectedContent[i] = this.settings.leftStyle.concat(selectedContent[i].concat(this.settings.rightStyle))
-          
+          var text = headings[sectionBinarySearch(line, headings)].heading
+          console.log(text)
+          left = originalLine.lastIndexOf(text)
+          if (left > 0) applyLeft = true;
+          console.log('left in heading:', left)
+          applyRightArray[i] = true
         }
       } else if (sections[j].type === "list") {
         console.log("list")
+        if (this.settings.skipListItems) {
+          isFormatEmpty[i] = true;
+          console.log('skipping List Item')
+          continue
+        } 
+        if (isAfterListHeading) { 
+          console.log("line is after list heading")
+          if (!isFormatEmpty[i]) {
+            applyLeft = true;
+            isAfterListHeading = false;
+          }
+        } else applyLeft = false
+
+        var listIndex = sectionBinarySearch(line, listItems)
+        var originalLine = doc.getLine(line)
+        var texttrimmed = originalLine
+        var selectionStartCol = originalLine.lastIndexOf(selectedContent[i])
+        var left = 0
+        var listItem = listItems[listIndex]
+        console.log('item ', listIndex, 'found via binary search', listItem)
+        /* if this is the first line of the ListItem */
+        if (listItem.position.start.line == line){
+          applyLeft = true
+          while (listItems[listIndex].position.start.col > selectionStartCol) {
+            console.log("List item starts in col", listItems[listIndex].position.start.col, " which is to the right of where the selection starts,", selectionStartCol, "so the selection is probably in the preceding list item.")
+            listIndex--;
+          }
+          while (listIndex+1 < listItems.length && listItems[listIndex+1].position.start.line === line && listItems[listIndex+1].position.start.col < selectionStartCol) {
+            console.log("The start of the selected part of this line seems to be after the start of the next list item.")
+            console.log("liststart", listItems[listIndex].position.start.col)
+            console.log("selectionStart", selectionStartCol)
+            listIndex++;
+          }
+          while (true) {
+            console.log('listIndex', listIndex)
+            listItem = listItems[listIndex]
+            left = listItems[listIndex].position.start.col
+            console.log('left:', left)
+            var subLine = originalLine.substring(left)
+            var texttrimmed: string;
+            var startUntrimmed: number;
+            console.log(subLine)
+            if (typeof(listItem.task) != 'undefined') {
+              startUntrimmed = subLine.indexOf(listItem.task.concat(']')) + 2
+              left += startUntrimmed
+              subLine = originalLine.substring(left)
+              texttrimmed = subLine.trimStart()
+              left += subLine.length - texttrimmed.length
+              console.log('text,' + subLine)
+              console.log('left,', left)
+            } else {
+              /* Taskless list items may start with whitespace*/
+              texttrimmed = subLine.trimStart()
+              /* But after the whitespace, there should be a *, -, or 1., then more whitespace*/
+              texttrimmed = texttrimmed.substring(texttrimmed.search(/\s/)).trimStart()
+              left += subLine.length - texttrimmed.length
+              console.log('left after removing prefix:', left)
+            }
+            
+            if (listIndex + 1 < listItems.length && listItems[listIndex + 1].position.start.line === line && listItems[listIndex + 1].position.start.col <= left){
+              listIndex++;
+              console.log('listIndex', listIndex)
+            } else {
+              console.log(texttrimmed)
+              break
+            }
+          }
+        } else {
+          console.log('not first line')
+          texttrimmed = originalLine.trimStart()
+          left = originalLine.length - texttrimmed.length;
+        }
+        if (originalLine.substring(left).search(/#{1,6}\s/) == 0) {
+          console.log("This is a heading inside a list.")
+          applyLeft = true;
+          applyRightArray[i] = true;
+          if (i - 1 >= 0) applyRightArray[i-1] = true;
+          isAfterListHeading = true;
+          subLine = texttrimmed
+          texttrimmed = texttrimmed.substring(texttrimmed.search(/\s/)).trimStart()
+          left += subLine.length - texttrimmed.length
+          console.log('left', left)
+        }
+
+        if (listItem.position.end.line === line || i == selectedContent.length - 1){
+          console.log("end of block or selection")
+          if (isFormatEmpty[i]) {
+            console.log("isFormatEmpty")
+            for (var k = i; isFormatEmpty[k] && k >= 0; k--) {console.log('k:', k)}
+            if (!isFormatEmpty[k]) {applyRightArray[k] = true;}
+          } else applyRightArray[i] = true
+        } else console.log("Not end of block.")
+  
       } else {
         console.log("not sure what this is", sections[j].type)
       }
+      console.log("Time to applyLeft")
+      if (applyLeft) {
+        console.log('left at application:', left)
+        if (left <= selectionStartCol) {
+          selectedContent[i] = this.settings.leftStyle.concat(selectedContent[i])
+        } else {
+          var formatable = selectedContent[i].substring(left - selectionStartCol)
+          if (formatable === "") {
+            isFormatEmpty[i] = true;
+            continue
+          }
+          selectedContent[i] = selectedContent[i].substring(0, left - selectionStartCol).concat(this.settings.leftStyle).concat(formatable)
+        }
+      }
+    applyLeft = false
+    } /* end for loop over all lines of selectedContent indexed by i */
 
-    };
+    for (var i=0; i<selectedContent.length; i++) {
+      if (applyRightArray[i] && !isFormatEmpty[i]) {
+        selectedContent[i] = selectedContent[i].concat(this.settings.rightStyle)
+      }
+    }
 
-    console.log(doc.getCursor('from'));
-    const selectionEndCursor = doc.getCursor('to')
-    console.log(doc.getCursor('to'))
+    // console.log(doc.getCursor('from'));
+    // const selectionEndCursor = doc.getCursor('to')
+    // console.log(doc.getCursor('to'))
 
     /* Dealing with the first line
 
@@ -221,6 +349,7 @@ function sectionBinarySearch(line: number, sections: CacheItem[]): number {
 }
 
 
+
 class MultilineFormattingSettingTab extends PluginSettingTab {
 	plugin: MultilineFormattingPlugin;
 
@@ -257,5 +386,27 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
           this.plugin.settings.rightStyle = value;
           await this.plugin.saveSettings();
         }));
+
+    new Setting(containerEl)
+      .setName('Skip List Items')
+      .setDesc('Formatting list items is experimental and may include bugs. Turn this toggle OFF to attempt to format them.')
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.skipListItems);
+        t.onChange(async (v) => {
+          this.plugin.settings.skipListItems = v;
+          await this.plugin.saveSettings();
+        })
+      });
+    
+    new Setting(containerEl)
+        .setName('Skip Headings')
+        .setDesc('Formatting headings is experimental and may include bugs. Turn this toggle OFF to attempt to format them.')
+        .addToggle((t) => {
+          t.setValue(this.plugin.settings.skipHeadings);
+          t.onChange(async (v) => {
+            this.plugin.settings.skipHeadings = v;
+            await this.plugin.saveSettings();
+          })
+        });
 	}
 }
