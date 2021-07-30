@@ -330,12 +330,19 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
 			.setName('Nickname')
-			.setDesc('The name for your formatting command in the command palette.')
+			.setDesc('The name for your formatting command in the command palette. Requires restart to take effect.')
 			.addText(text => text
 				// .setPlaceholder('')
 				.setValue(this.plugin.settings.nickname)
 				.onChange(async (value) => {
 					this.plugin.settings.nickname = value;
+          this.plugin.addCommand({
+            id: 'multi-line-format',
+            name: this.plugin.settings.nickname,
+            callback: () => {
+              this.plugin.editModeGuard(async () => await this.plugin.formatSelection())
+            }
+          });
 					await this.plugin.saveSettings();
 				}));
 
