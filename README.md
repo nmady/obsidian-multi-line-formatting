@@ -21,7 +21,7 @@ Again, this is an early version of this plugin which has had limited testing. He
 - Add more commands (yes, I want to be able to set up my hotkeys for both bold and italics too.)
 - Handle all embedded list items, blockquotes, and headings.
 
-## Bug reports and feature requests appreciated!**
+## Bug reports and feature requests appreciated!
 
 Please let me know how this plugin can be improved.
 
