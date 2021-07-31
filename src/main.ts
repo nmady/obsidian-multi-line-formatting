@@ -20,7 +20,7 @@ const DEFAULT_SETTINGS: MultilineFormattingPluginSettings = {
   rightStyle: '</span>',
   skipHeadings: false,
   skipListItems: false,
-  skipBlockquotes: true
+  skipBlockquotes: false
 }
 
 export default class MultilineFormattingPlugin extends Plugin {
@@ -76,8 +76,8 @@ export default class MultilineFormattingPlugin extends Plugin {
       return 
     }
     console.debug('Sections', sections)
-    console.log('ListItems', listItems)
-    console.log('Original selectedContent:', selectedContent)
+    console.debug('ListItems', listItems)
+    console.debug('Original selectedContent:', selectedContent)
 
     /* We're going to apply the rightStyle at the very end because sometimes
       headers close a block unexpectedly, in which case have to look to the block
@@ -93,14 +93,16 @@ export default class MultilineFormattingPlugin extends Plugin {
     
     /* The next (non-empty) line after a heading embedded in a list needs 
       leftStyle applied. */
-    let isAfterEmbeddedHeading = false
+    let isAfterEmbeddedParaBreak = false
+
+    let previousBlockquoteLevel = 0;
 
     const selectionStartCursor = doc.getCursor('from');
 
     let currentSectionIndex = sectionBinarySearch(selectionStartCursor.line, sections);
 
     for (let i=0; i < selectedContent.length; i++) {
-      console.log('Starting line', i, 'now, with content:', selectedContent[i])
+      console.debug('Starting line', i, 'now, with content:', selectedContent[i])
       /* Reset applyLeft to false after each iteration. This variable lets us set
       a 'left' edge between a heading/list prefix, and only apply formatting to
       lines where there is selected content to the right of that left edge. */ 
@@ -110,98 +112,120 @@ export default class MultilineFormattingPlugin extends Plugin {
 
       if (selectedContent[i] === ""){
         isFormatEmpty[i] = true;
-        console.log("empty line:", isFormatEmpty)
+        console.debug("empty line:", isFormatEmpty)
       }
       const lineNo = i + selectionStartCursor.line
-      console.log("Lineno:", lineNo, "Section:", currentSectionIndex)
+      console.debug("Lineno:", lineNo, "Section:", currentSectionIndex)
       const originalLine = doc.getLine(lineNo)
-      console.log("Full line:", originalLine)
+      console.debug("Full line:", originalLine)
       let left = 0
 
       while (sections[currentSectionIndex].position.end.line < lineNo){
         currentSectionIndex++;
       }
 
+      let isBlockEnd = false;
+
       if (sections[currentSectionIndex].type === "paragraph") {
-        console.log("paragraph")
+        console.debug("paragraph")
         if (!isFormatEmpty[i]){
           const whitespaceMatch = selectedContent[i].match(/^(\s*)(.*)/)
-          console.log(whitespaceMatch)
+          console.debug(whitespaceMatch)
           selectedContent[i] = whitespaceMatch[1] + this.settings.leftStyle + whitespaceMatch[2]
           /* jump to the end of the paragraph */
           i = sections[currentSectionIndex].position.end.line - selectionStartCursor.line
-          console.log('i', i)
+          console.debug('i', i)
           // lineNo = i + selectionStartCursor.line;
           applyRightArray[i] = true
           continue
         }
       } else if (sections[currentSectionIndex].type === "heading") {
-        console.log("heading");
+        console.debug("heading");
         if (this.settings.skipHeadings) {
           isFormatEmpty[i] = true;
-          console.log('skipping Heading')
+          console.debug('skipping Heading')
           continue
         } 
         const text = headings[sectionBinarySearch(lineNo, headings)].heading
-        console.log(text)
+        console.debug(text)
         left = originalLine.lastIndexOf(text)
         if (left > 0) applyLeft = true;
-        console.log('left in heading:', left)
+        console.debug('left in heading:', left)
         applyRightArray[i] = true
       } else if (sections[currentSectionIndex].type === "blockquote") {
-        console.log("blockquote")
+        console.debug("blockquote")
         if (this.settings.skipBlockquotes) {
           isFormatEmpty[i] = true;
-          console.log('skipping Blockquote')
+          console.debug('skipping Blockquote')
           continue
         }
         /* if this is the first line of the Blockquote */
-        if (sections[currentSectionIndex].position.start.line == lineNo) applyLeft = true
+        if (sections[currentSectionIndex].position.start.line == lineNo || isAfterEmbeddedParaBreak) {
+          applyLeft = true
+          console.debug('Applying left because this is the first line')
+          isAfterEmbeddedParaBreak = false
+        }
 
         /* The prefix for a blockquote is some combination of whitespace and >*/
-        const blockquoteRegex: RegExp = /^[\s>]*/g
-        const prefix = blockquoteRegex.exec(originalLine)[0];
-        console.log('bq-level:', prefix.split('>').length-1)
+        const blockquoteMatch = originalLine.match(/^([\s>]*)(.*)/)
+        const prefix = blockquoteMatch[1];
+        const text = blockquoteMatch[2];
+        const blockquoteLevel = prefix.split('>').length-1
+        console.debug('bq-level:', blockquoteLevel, 'previous:', previousBlockquoteLevel)
+        if (previousBlockquoteLevel < blockquoteLevel) {
+          applyLeft = true
+          const k = rewindToFalse(isFormatEmpty, i)
+          if (k >= 0) {applyRightArray[k] = true}
+          previousBlockquoteLevel = blockquoteLevel
+        } 
+        if (text.length == 0) {
+          isFormatEmpty[i] = true
+          const k = rewindToFalse(isFormatEmpty, i-1)
+          if (k >= 0) {
+            applyRightArray[k] = true
+          }
+          isAfterEmbeddedParaBreak = true
+        }
         left = prefix.length
-        console.log('left after removing prefix:', left)
+        console.debug('left after removing prefix:', left)
         if (sections[currentSectionIndex].position.end.line == lineNo) applyRightArray[i] = true
       } else if (sections[currentSectionIndex].type === "list") {
-        console.log("list")
+        console.debug("list")
         if (this.settings.skipListItems) {
           isFormatEmpty[i] = true;
-          console.log('skipping List Item')
+          console.debug('skipping List Item')
           continue
         } 
-        if (isAfterEmbeddedHeading) { 
-          console.log("line is after list heading")
+        if (isAfterEmbeddedParaBreak) { 
+          console.debug("line is after list heading")
           if (!isFormatEmpty[i]) {
             applyLeft = true;
-            isAfterEmbeddedHeading = false;
+            isAfterEmbeddedParaBreak = false;
           }
         } else applyLeft = false
 
         let listIndex = sectionBinarySearch(lineNo, listItems)
         const lineTrimmed = originalLine
         const listItem = listItems[listIndex]
-        console.log('item ', listIndex, 'found via binary search', listItem)
+        console.debug('item ', listIndex, 'found via binary search', listItem)
         /* if this is the first line of the ListItem */
         if (listItem.position.start.line == lineNo){
           applyLeft = true
           while (listItems[listIndex].position.start.col > selectionStartCol) {
-            console.log("List item starts in col", listItems[listIndex].position.start.col, " which is to the right of where the selection starts,", selectionStartCol, "so the selection is probably in the preceding list item.")
+            console.debug("List item starts in col", listItems[listIndex].position.start.col, " which is to the right of where the selection starts,", selectionStartCol, "so the selection is probably in the preceding list item.")
             listIndex--;
           }
           while (listIndex+1 < listItems.length && listItems[listIndex+1].position.start.line === lineNo && listItems[listIndex+1].position.start.col < selectionStartCol) {
-            console.log("The start of the selected part of this line seems to be after the start of the next list item.")
-            console.log("liststart", listItems[listIndex].position.start.col)
-            console.log("selectionStart", selectionStartCol)
+            console.debug("The start of the selected part of this line seems to be after the start of the next list item.")
+            console.debug("liststart", listItems[listIndex].position.start.col)
+            console.debug("selectionStart", selectionStartCol)
             listIndex++;
           }
           while (true) {
-            console.log('listIndex', listIndex)
+            console.debug('listIndex', listIndex)
             const listItem = listItems[listIndex]
             left = listItems[listIndex].position.start.col
-            console.log('left:', left)
+            console.debug('left:', left)
             // let subLine = originalLine.substring(left)
             if (typeof(listItem.task) != 'undefined') {
               /* List item with a task */
@@ -210,58 +234,66 @@ export default class MultilineFormattingPlugin extends Plugin {
               const subLine = originalLine.substring(left)
               const subLineTrimmed = subLine.trimStart()
               left += subLine.length - subLineTrimmed.length
-              console.log('text,' + subLine)
-              console.log('left,', left)
+              console.debug('text,' + subLine)
+              console.debug('left,', left)
             } else {
               /* Taskless list items */
               const prefix = originalLine.substring(left).match(/^\s*(\*|-|\d+\.)\s*/)[0]
-              console.log('prefix:', prefix)
+              console.debug('prefix:', prefix)
               left += prefix.length
-              console.log('left after removing prefix:', left)
+              console.debug('left after removing prefix:', left)
             }
             
             if (listIndex + 1 < listItems.length && listItems[listIndex + 1].position.start.line === lineNo && listItems[listIndex + 1].position.start.col <= left){
               listIndex++;
-              console.log('listIndex', listIndex)
+              console.debug('listIndex', listIndex)
             } else {
-              console.log(lineTrimmed)
+              console.debug(lineTrimmed)
               break
             }
           }
         } else {
-          console.log('not first line')
+          console.debug('not first line')
           left = originalLine.length - originalLine.trimStart().length;
         }
         const headingMatch = originalLine.substring(left).match(/^\s*#{1,6}\s+/)
         if (headingMatch != null) {
-          console.log("This is a heading inside a list.")
+          console.debug("This is a heading inside a list.")
           applyLeft = true;
           applyRightArray[i] = true;
           if (i - 1 >= 0) applyRightArray[i-1] = true;
-          isAfterEmbeddedHeading = true;
+          isAfterEmbeddedParaBreak = true;
           left += headingMatch[0].length
-          console.log('left', left)
+          console.debug('left', left)
         }
 
-        if (listItem.position.end.line === lineNo || i == selectedContent.length - 1){
-          console.log("end of block or selection")
+        if (listItem.position.end.line === lineNo){
+          isBlockEnd = true;
+          console.debug("end of listItem")
           if (isFormatEmpty[i]) {
-            console.log("isFormatEmpty")
+            console.debug("isFormatEmpty")
             let k = i;
             while (k >= 0 && isFormatEmpty[k]) {
               k--;
-              console.log('k:', k)
+              console.debug('k:', k)
             }
             if (!isFormatEmpty[k]) {applyRightArray[k] = true;}
           } else applyRightArray[i] = true
-        } else console.log("Not end of block.")
+        } else console.debug("Not end of listitem.")
   
       } else {
-        console.log("not sure what this is", sections[currentSectionIndex].type)
+        console.debug("not sure what this is", sections[currentSectionIndex].type)
+        isFormatEmpty[i] = true
       }
-      console.log("Time to applyLeft")
+
+      if (sections[currentSectionIndex].position.end.line === lineNo || i >= selectedContent.length - 1 || isBlockEnd){
+        const k = rewindToFalse(isFormatEmpty, i)
+        if (k >= 0) applyRightArray[k] = true
+      }
+
+      console.debug("Time to applyLeft")
       if (applyLeft) {
-        console.log('left at application:', left)
+        console.debug('left at application:', left)
         if (left <= selectionStartCol) {
           selectedContent[i] = this.settings.leftStyle.concat(selectedContent[i])
         } else {
@@ -295,13 +327,22 @@ export default class MultilineFormattingPlugin extends Plugin {
 	}
 }
 
+function rewindToFalse(boolArray: boolean[], startIndex: number): number {
+  let k = startIndex;
+  while (k >= 0 && boolArray[k]) {
+    k--;
+    console.debug('k:', k)
+  }
+  return k;
+}
+
 function sectionBinarySearch(line: number, sections: CacheItem[]): number {
   let low = 0
   let high = sections.length
   while (low < high){
     const midpoint = low + ((high - low) >> 1)
-    console.log(low, high)
-    console.log(midpoint)
+    console.debug(low, high)
+    console.debug(midpoint)
     const midposition = sections[midpoint].position
     if (line < midposition.start.line){
       /* cursor before middle section */
@@ -314,6 +355,7 @@ function sectionBinarySearch(line: number, sections: CacheItem[]): number {
       low = midpoint + 1
     }
   }
+  /* this might not be the right thing to do. */
   return low
 }
 
@@ -336,7 +378,7 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
 			.setName('Nickname')
-			.setDesc('The name for your formatting command in the command palette. Requires restart to take effect.')
+			.setDesc('The name for your formatting command in the command palette.')
 			.addText(text => text
 				// .setPlaceholder('')
 				.setValue(this.plugin.settings.nickname)
@@ -408,7 +450,6 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
             this.plugin.settings.skipBlockquotes = v;
             await this.plugin.saveSettings();
           })
-          // .setDisabled(true)
         });
 	}
 }
