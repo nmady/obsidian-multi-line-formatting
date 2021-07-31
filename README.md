@@ -4,7 +4,7 @@ This plugin is designed to offer formatting over an entire selection, even if th
 
 ## Usage
 
-Select the text you want to format, and use the command **Format, even over multiple lines** (you can change this command name and what kind of formatting to apply in settings). Be careful not to start or end your selection in the middle of another type of paired formatting (e.g. bold, italics, highlighting, etc.)
+Select the text you want to format, and use the command **Format, even over multiple lines** (you can change this command name and what kind of formatting to apply in Settings). Be careful not to start or end your selection in the middle of another type of paired formatting (e.g. bold, italics, highlighting, etc.)
 
 ## Settings
 
@@ -14,7 +14,7 @@ If you want to **Skip some section types**, open the collapsible section in Sett
 
 ## Limitations
 
-Again, this is an early version of this plugin which has had limited testing. Help me improve it by reporting any unexpected behaviour. However, note that currently list items and headings embedded in blockquotes and blockquotes embedded in list items will not be formatted corrects. Code block sections are skipped, but code blocks embedded in list items or blockquotes are not formatted correctly. 
+Again, this is an early version of this plugin which has had limited testing. Help me improve it by reporting any unexpected behaviour. However, note that currently list items and headings embedded in blockquotes and blockquotes embedded in list items will not be formatted correctly. Code block sections are skipped, but code blocks embedded in list items or blockquotes are not formatted correctly. 
 
 ### Planned Features
 
