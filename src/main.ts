@@ -443,7 +443,7 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
 
     new Setting(skipDetails)
         .setName('Skip Blockquotes')
-        .setDesc('Turn this toggle ON to exclude text in Blockquotes. (OFF Disabled, since Blockquote formatting in development!)')
+        .setDesc('Turn this toggle ON to exclude text in blockquotes.')
         .addToggle((t) => {
           t.setValue(this.plugin.settings.skipBlockquotes);
           t.onChange(async (v) => {
