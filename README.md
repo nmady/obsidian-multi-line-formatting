@@ -8,9 +8,11 @@ Select the text you want to format, and use the command **Format, even over mult
 
 ## Settings
 
-You can enter the formatting you want to apply as **Left** and **Right**. The default is HTML highlighting (using span tags), since sometimes one colour just won't cut it. You can change the Nickname of the command so that the name in the command palette better reflects the kind of formatting you choose.
+Two formatting styles exist by default. To add a new frormatting style, scroll to the bottom of the settings pane and click the **Add formatting style** button.
 
-If you want to **Skip some section types**, open the collapsible section in Settings, and you can toggle those "skip" settings for Headings, Blockquotes, and List Items.
+For each fromatting style, you can enter the formatting you want to apply as **Left** and **Right**. You can change the Nickname of the command so that the name in the command palette better reflects the kind of formatting you choose.
+
+If you want to **Skip some section types** for a particular formatting style, open the collapsible section below it in Settings, and you can toggle those "skip" settings for Headings, Blockquotes, and List Items.
 
 ## Limitations
 
@@ -18,7 +20,6 @@ Again, this is an early version of this plugin which has had limited testing. He
 
 ### Planned Features
 
-- Add more commands (yes, I want to be able to set up my hotkeys for both bold and italics too.)
 - Handle all embedded list items, blockquotes, and headings.
 
 ## Bug reports and feature requests appreciated!

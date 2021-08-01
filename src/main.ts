@@ -1,11 +1,16 @@
 import { 
-  App, Plugin, PluginSettingTab, Setting, MarkdownView, CacheItem, EditorPosition, ListItemCache, HeadingCache
+  App, Plugin, PluginSettingTab, Setting, MarkdownView, CacheItem, stringifyYaml
 } from 'obsidian';
 import NRDoc from './doc';
 
 const PLUGIN_NAME = "Multi-line Formatting"
 
 interface MultilineFormattingPluginSettings {
+  styleArray: MultilineFormattingStyleSettings[];
+}
+
+interface MultilineFormattingStyleSettings {
+  id: string;
   nickname: string;
 	leftStyle: string;
   rightStyle: string;
@@ -15,9 +20,31 @@ interface MultilineFormattingPluginSettings {
 }
 
 const DEFAULT_SETTINGS: MultilineFormattingPluginSettings = {
-  nickname: 'Format, even over multiple lines',
-	leftStyle: '<span style="background-color:#00FEFE">',
-  rightStyle: '</span>',
+  styleArray: [{ 
+    id: 'multi-line-format-cyan-highlight',
+    nickname: 'Format, even over multiple lines',
+    leftStyle: '<span style="background-color:#00FEFE">',
+    rightStyle: '</span>',
+    skipHeadings: false,
+    skipListItems: false,
+    skipBlockquotes: false
+  },
+  { 
+    id: 'multi-line-format-bold',
+    nickname: 'Bold, even over multiple lines',
+    leftStyle: '**',
+    rightStyle: '**',
+    skipHeadings: false,
+    skipListItems: false,
+    skipBlockquotes: false
+  }]
+}
+
+const NEW_STYLE_DEFAULTS: MultilineFormattingStyleSettings = {
+  id: '',
+  nickname: 'Empty format',
+  leftStyle: '',
+  rightStyle: '',
   skipHeadings: false,
   skipListItems: false,
   skipBlockquotes: false
@@ -35,13 +62,9 @@ export default class MultilineFormattingPlugin extends Plugin {
 
     this.NRDoc = new NRDoc();
 
-		this.addCommand({
-			id: 'multi-line-format',
-			name: this.settings.nickname,
-			callback: () => {
-        this.editModeGuard(async () => await this.formatSelection())
-			}
-		});
+    for (const style of this.settings.styleArray){
+      this.addStyleCommand(style);
+    }
 
 		this.addSettingTab(new MultilineFormattingSettingTab(this.app, this));
 
@@ -61,7 +84,7 @@ export default class MultilineFormattingPlugin extends Plugin {
     }
   }
 
-  async formatSelection(): Promise<void> {
+  async formatSelection(style: MultilineFormattingStyleSettings): Promise<void> {
     const mdView = this.app.workspace.activeLeaf.view as MarkdownView;
     if(!mdView) {return}
     const doc = mdView.editor;
@@ -118,20 +141,22 @@ export default class MultilineFormattingPlugin extends Plugin {
       console.debug("Lineno:", lineNo, "Section:", currentSectionIndex)
       const originalLine = doc.getLine(lineNo)
       console.debug("Full line:", originalLine)
-      let left = 0
+      let isBlockEnd = false;
+      let left = 0;
 
       while (sections[currentSectionIndex].position.end.line < lineNo){
         currentSectionIndex++;
       }
 
-      let isBlockEnd = false;
-
       if (sections[currentSectionIndex].type === "paragraph") {
         console.debug("paragraph")
-        if (!isFormatEmpty[i]){
+        if (!isFormatEmpty[i] || i == 0){
           const whitespaceMatch = selectedContent[i].match(/^(\s*)(.*)/)
           console.debug(whitespaceMatch)
-          selectedContent[i] = whitespaceMatch[1] + this.settings.leftStyle + whitespaceMatch[2]
+          if (whitespaceMatch[2].length == 0) {
+            isFormatEmpty[i] = true;
+          }
+          selectedContent[i] = whitespaceMatch[1] + style.leftStyle + whitespaceMatch[2]
           /* jump to the end of the paragraph */
           i = sections[currentSectionIndex].position.end.line - selectionStartCursor.line
           console.debug('i', i)
@@ -141,7 +166,7 @@ export default class MultilineFormattingPlugin extends Plugin {
         }
       } else if (sections[currentSectionIndex].type === "heading") {
         console.debug("heading");
-        if (this.settings.skipHeadings) {
+        if (style.skipHeadings) {
           isFormatEmpty[i] = true;
           console.debug('skipping Heading')
           continue
@@ -154,7 +179,7 @@ export default class MultilineFormattingPlugin extends Plugin {
         applyRightArray[i] = true
       } else if (sections[currentSectionIndex].type === "blockquote") {
         console.debug("blockquote")
-        if (this.settings.skipBlockquotes) {
+        if (style.skipBlockquotes) {
           isFormatEmpty[i] = true;
           console.debug('skipping Blockquote')
           continue
@@ -191,7 +216,7 @@ export default class MultilineFormattingPlugin extends Plugin {
         if (sections[currentSectionIndex].position.end.line == lineNo) applyRightArray[i] = true
       } else if (sections[currentSectionIndex].type === "list") {
         console.debug("list")
-        if (this.settings.skipListItems) {
+        if (style.skipListItems) {
           isFormatEmpty[i] = true;
           console.debug('skipping List Item')
           continue
@@ -295,14 +320,14 @@ export default class MultilineFormattingPlugin extends Plugin {
       if (applyLeft) {
         console.debug('left at application:', left)
         if (left <= selectionStartCol) {
-          selectedContent[i] = this.settings.leftStyle.concat(selectedContent[i])
+          selectedContent[i] = style.leftStyle.concat(selectedContent[i])
         } else {
           const formatable = selectedContent[i].substring(left - selectionStartCol)
           if (formatable === "") {
             isFormatEmpty[i] = true;
             continue
           }
-          selectedContent[i] = selectedContent[i].substring(0, left - selectionStartCol).concat(this.settings.leftStyle).concat(formatable)
+          selectedContent[i] = selectedContent[i].substring(0, left - selectionStartCol).concat(style.leftStyle).concat(formatable)
         }
       }
     applyLeft = false
@@ -310,7 +335,7 @@ export default class MultilineFormattingPlugin extends Plugin {
 
     for (let i=0; i<selectedContent.length; i++) {
       if (applyRightArray[i] && !isFormatEmpty[i]) {
-        selectedContent[i] = selectedContent[i].concat(this.settings.rightStyle)
+        selectedContent[i] = selectedContent[i].concat(style.rightStyle)
       }
     }
 
@@ -325,6 +350,37 @@ export default class MultilineFormattingPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
+
+  addStyleCommand(style: MultilineFormattingStyleSettings){
+    this.addCommand({
+      id: style.id,
+      name: style.nickname,
+      callback: () => {
+        this.editModeGuard(async () => await this.formatSelection(style))
+      }
+    });
+  }
+
+  addFormattingStyle(){
+    const id = String(Math.abs((Date.now() ^ Math.random()*(1<<30)) % (1<<30)))
+    const newStyle = {...NEW_STYLE_DEFAULTS, id: id};
+    this.settings.styleArray.push(newStyle)
+    this.addStyleCommand(newStyle)
+    return newStyle
+  }
+
+  deleteFormattingStyle(style: MultilineFormattingStyleSettings){
+    const index = this.settings.styleArray.indexOf(style)
+    if (index >= 0) {
+      this.settings.styleArray.splice(index, 1)
+    }
+    //@ts-ignore
+    const appCommands = this.app.commands
+    if (appCommands.findCommand(style.id)) {
+      delete appCommands.editorCommands[style.id];
+      delete appCommands.commands[style.id];
+    }
+  }
 }
 
 function rewindToFalse(boolArray: boolean[], startIndex: number): number {
@@ -376,43 +432,62 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
 
 		containerEl.createEl('h2', {text: 'Settings for ' + PLUGIN_NAME});
 
-    new Setting(containerEl)
-			.setName('Nickname')
-			.setDesc('The name for your formatting command in the command palette.')
-			.addText(text => text
-				// .setPlaceholder('')
-				.setValue(this.plugin.settings.nickname)
-				.onChange(async (value) => {
-					this.plugin.settings.nickname = value;
-          this.plugin.addCommand({
-            id: 'multi-line-format',
-            name: this.plugin.settings.nickname,
-            callback: () => {
-              this.plugin.editModeGuard(async () => await this.plugin.formatSelection())
-            }
-          });
-					await this.plugin.saveSettings();
-				}));
+    const allStyleDiv = containerEl.createEl('div')
 
-		new Setting(containerEl)
-			.setName('Left')
-			.setDesc('The opening tag, or the left part of a highlight (==), bold (**), etc.')
-			.addTextArea(text => text
-				.setPlaceholder('')
-				.setValue(this.plugin.settings.leftStyle)
-				.onChange(async (value) => {
-					this.plugin.settings.leftStyle = value;
-					await this.plugin.saveSettings();
-				}));
+    for (const style of this.plugin.settings.styleArray) {
+      const div = this.formattingStyleSetting(style)
+      allStyleDiv.appendChild(div)
+    }
+
+    new Setting(containerEl)
+      .addButton((t) => {
+        t.setButtonText('Add new formatting style')
+        t.onClick(async (v) => {
+          const newStyle = this.plugin.addFormattingStyle()
+          const div = this.formattingStyleSetting(newStyle);
+          allStyleDiv.appendChild(div)
+        })
+      })
+	}
+
+  formattingStyleSetting(style: MultilineFormattingStyleSettings) {
+
+    const containerEl = document.createElement('div');
+
+    const commandheader = containerEl.createEl('h3', {text: 'Settings for ' + style.nickname});
+
+    new Setting(containerEl)
+      .setName('Nickname')
+      .setDesc('The name for your formatting command in the command palette.')
+      .addText(text => text
+        // .setPlaceholder('')
+        .setValue(style.nickname)
+        .onChange(async (value) => {
+          style.nickname = value;
+          commandheader.setText('Settings for ' + style.nickname)
+          this.plugin.addStyleCommand(style);
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Left')
+      .setDesc('The opening tag, or the left part of a highlight (==), bold (**), etc.')
+      .addTextArea(text => text
+        .setPlaceholder('')
+        .setValue(style.leftStyle)
+        .onChange(async (value) => {
+          style.leftStyle = value;
+          await this.plugin.saveSettings();
+        }));
 
     new Setting(containerEl)
       .setName('Right')
       .setDesc('The closing tag, or the right part of a highlight (==), bold (**), etc.')
       .addTextArea(text => text
         .setPlaceholder('')
-        .setValue(this.plugin.settings.rightStyle)
+        .setValue(style.rightStyle)
         .onChange(async (value) => {
-          this.plugin.settings.rightStyle = value;
+          style.rightStyle = value;
           await this.plugin.saveSettings();
         }));
 
@@ -423,9 +498,9 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
       .setName('Skip List Items')
       .setDesc('Turn this toggle ON to exclude text in list items.')
       .addToggle((t) => {
-        t.setValue(this.plugin.settings.skipListItems);
+        t.setValue(style.skipListItems);
         t.onChange(async (v) => {
-          this.plugin.settings.skipListItems = v;
+          style.skipListItems = v;
           await this.plugin.saveSettings();
         })
       });
@@ -434,9 +509,9 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
         .setName('Skip Headings')
         .setDesc('Turn this toggle ON to exclude text in headings.')
         .addToggle((t) => {
-          t.setValue(this.plugin.settings.skipHeadings);
+          t.setValue(style.skipHeadings);
           t.onChange(async (v) => {
-            this.plugin.settings.skipHeadings = v;
+            style.skipHeadings = v;
             await this.plugin.saveSettings();
           })
         });
@@ -445,11 +520,25 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
         .setName('Skip Blockquotes')
         .setDesc('Turn this toggle ON to exclude text in blockquotes.')
         .addToggle((t) => {
-          t.setValue(this.plugin.settings.skipBlockquotes);
+          t.setValue(style.skipBlockquotes);
           t.onChange(async (v) => {
-            this.plugin.settings.skipBlockquotes = v;
+            style.skipBlockquotes = v;
             await this.plugin.saveSettings();
           })
         });
-	}
+
+    new Setting(containerEl)
+      .addButton((t) => {
+        t.setButtonText('Delete this style')
+        t.onClick(async (v) => {
+          if (confirm("Are you sure you want to delete " + style.nickname + '?')) {
+            containerEl.parentElement?.removeChild(containerEl)
+            this.plugin.deleteFormattingStyle(style);
+          }
+        })
+      })
+
+    return containerEl;
+  }
+
 }
