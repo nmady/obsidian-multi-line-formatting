@@ -98,6 +98,19 @@ export default class MultilineFormattingPlugin extends Plugin {
     if(selectedContent.length <= 0) { 
       return 
     }
+
+    const selectionStartCursor = doc.getCursor('from');
+
+    /* If nothing is selected, simply add both sides of the formatting 
+      and stick the cursor between them */
+    console.debug('empty selection', selectedContent.length == 1, selectedContent[0] === "")
+    if (selectedContent.length == 1 && selectedContent[0] === ""){
+      console.debug('Empty selection')
+      doc.replaceSelection(style.leftStyle + style.rightStyle);
+      doc.setCursor(selectionStartCursor.line, selectionStartCursor.ch + style.leftStyle.length)
+      return
+    }
+
     console.debug('Sections', sections)
     console.debug('ListItems', listItems)
     console.debug('Original selectedContent:', selectedContent)
@@ -111,16 +124,15 @@ export default class MultilineFormattingPlugin extends Plugin {
 
     /* If there is no text in the line to format (empty line or only heading/list
        prefix) then we don't want to append the rightStyle after the fact*/
-    const isFormatEmpty: boolean[] = new Array(selectedContent.length)
-    isFormatEmpty.fill(false);
+    let lastNonEmptyIndex = -1
+    // const isFormatEmpty: boolean[] = new Array(selectedContent.length)
+    // isFormatEmpty.fill(false);
     
     /* The next (non-empty) line after a heading embedded in a list needs 
       leftStyle applied. */
     let isAfterEmbeddedParaBreak = false
 
     let previousBlockquoteLevel = 0;
-
-    const selectionStartCursor = doc.getCursor('from');
 
     let currentSectionIndex = sectionBinarySearch(selectionStartCursor.line, sections);
 
@@ -129,20 +141,27 @@ export default class MultilineFormattingPlugin extends Plugin {
       /* Reset applyLeft to false after each iteration. This variable lets us set
       a 'left' edge between a heading/list prefix, and only apply formatting to
       lines where there is selected content to the right of that left edge. */ 
-      let applyLeft = false
+      let applyLeft = false;
+      
+      let isEmpty = false
+
+      let isBlockEnd = false;
+
+      let left = 0;
 
       const selectionStartCol = (i > 0) ? 0 : selectionStartCursor.ch  
 
-      if (selectedContent[i] === ""){
-        isFormatEmpty[i] = true;
-        console.debug("empty line:", isFormatEmpty)
+      const whitespaceMatch = selectedContent[i].match(/^(\s*)(.*)/)
+      if (whitespaceMatch[2] === ""){
+        isEmpty = true;
+        console.debug("empty line")
+        /* note: we can't continue because the prefix might matter */
       }
+
       const lineNo = i + selectionStartCursor.line
       console.debug("Lineno:", lineNo, "Section:", currentSectionIndex)
       const originalLine = doc.getLine(lineNo)
       console.debug("Full line:", originalLine)
-      let isBlockEnd = false;
-      let left = 0;
 
       while (sections[currentSectionIndex].position.end.line < lineNo){
         currentSectionIndex++;
@@ -150,12 +169,7 @@ export default class MultilineFormattingPlugin extends Plugin {
 
       if (sections[currentSectionIndex].type === "paragraph") {
         console.debug("paragraph")
-        if (!isFormatEmpty[i] || i == 0){
-          const whitespaceMatch = selectedContent[i].match(/^(\s*)(.*)/)
-          console.debug(whitespaceMatch)
-          if (whitespaceMatch[2].length == 0) {
-            isFormatEmpty[i] = true;
-          }
+        if (!isEmpty){
           selectedContent[i] = whitespaceMatch[1] + style.leftStyle + whitespaceMatch[2]
           /* jump to the end of the paragraph */
           i = sections[currentSectionIndex].position.end.line - selectionStartCursor.line
@@ -167,7 +181,7 @@ export default class MultilineFormattingPlugin extends Plugin {
       } else if (sections[currentSectionIndex].type === "heading") {
         console.debug("heading");
         if (style.skipHeadings) {
-          isFormatEmpty[i] = true;
+          isEmpty = true;
           console.debug('skipping Heading')
           continue
         } 
@@ -180,12 +194,12 @@ export default class MultilineFormattingPlugin extends Plugin {
       } else if (sections[currentSectionIndex].type === "blockquote") {
         console.debug("blockquote")
         if (style.skipBlockquotes) {
-          isFormatEmpty[i] = true;
+          isEmpty = true;
           console.debug('skipping Blockquote')
           continue
         }
         /* if this is the first line of the Blockquote */
-        if (sections[currentSectionIndex].position.start.line == lineNo || isAfterEmbeddedParaBreak) {
+        if ((sections[currentSectionIndex].position.start.line == lineNo || isAfterEmbeddedParaBreak) && !isEmpty) {
           applyLeft = true
           console.debug('Applying left because this is the first line')
           isAfterEmbeddedParaBreak = false
@@ -199,13 +213,15 @@ export default class MultilineFormattingPlugin extends Plugin {
         console.debug('bq-level:', blockquoteLevel, 'previous:', previousBlockquoteLevel)
         if (previousBlockquoteLevel < blockquoteLevel) {
           applyLeft = true
-          const k = rewindToFalse(isFormatEmpty, i)
+          const k = lastNonEmptyIndex;
+          // const k = rewindToFalse(isFormatEmpty, i)
           if (k >= 0) {applyRightArray[k] = true}
           previousBlockquoteLevel = blockquoteLevel
         } 
-        if (text.length == 0) {
-          isFormatEmpty[i] = true
-          const k = rewindToFalse(isFormatEmpty, i-1)
+        if (text === "") {
+          isEmpty = true
+          const k = lastNonEmptyIndex;
+          // const k = rewindToFalse(isFormatEmpty, i-1)
           if (k >= 0) {
             applyRightArray[k] = true
           }
@@ -217,13 +233,13 @@ export default class MultilineFormattingPlugin extends Plugin {
       } else if (sections[currentSectionIndex].type === "list") {
         console.debug("list")
         if (style.skipListItems) {
-          isFormatEmpty[i] = true;
+          isEmpty = true;
           console.debug('skipping List Item')
           continue
         } 
         if (isAfterEmbeddedParaBreak) { 
           console.debug("line is after list heading")
-          if (!isFormatEmpty[i]) {
+          if (!isEmpty) {
             applyLeft = true;
             isAfterEmbeddedParaBreak = false;
           }
@@ -286,7 +302,9 @@ export default class MultilineFormattingPlugin extends Plugin {
           console.debug("This is a heading inside a list.")
           applyLeft = true;
           applyRightArray[i] = true;
-          if (i - 1 >= 0) applyRightArray[i-1] = true;
+          const k = lastNonEmptyIndex;
+          // const k = rewindToFalse(isFormatEmpty, i-1)
+          if (k >= 0) applyRightArray[k] = true;
           isAfterEmbeddedParaBreak = true;
           left += headingMatch[0].length
           console.debug('left', left)
@@ -295,25 +313,19 @@ export default class MultilineFormattingPlugin extends Plugin {
         if (listItem.position.end.line === lineNo){
           isBlockEnd = true;
           console.debug("end of listItem")
-          if (isFormatEmpty[i]) {
+          if (isEmpty) {
             console.debug("isFormatEmpty")
-            let k = i;
-            while (k >= 0 && isFormatEmpty[k]) {
-              k--;
-              console.debug('k:', k)
-            }
-            if (!isFormatEmpty[k]) {applyRightArray[k] = true;}
+            if (lastNonEmptyIndex >= 0) {applyRightArray[lastNonEmptyIndex] = true;}
           } else applyRightArray[i] = true
         } else console.debug("Not end of listitem.")
   
       } else {
         console.debug("not sure what this is", sections[currentSectionIndex].type)
-        isFormatEmpty[i] = true
+        isEmpty = true
       }
 
       if (sections[currentSectionIndex].position.end.line === lineNo || i >= selectedContent.length - 1 || isBlockEnd){
-        const k = rewindToFalse(isFormatEmpty, i)
-        if (k >= 0) applyRightArray[k] = true
+        if (lastNonEmptyIndex >= 0) applyRightArray[lastNonEmptyIndex] = true
       }
 
       console.debug("Time to applyLeft")
@@ -324,17 +336,18 @@ export default class MultilineFormattingPlugin extends Plugin {
         } else {
           const formatable = selectedContent[i].substring(left - selectionStartCol)
           if (formatable === "") {
-            isFormatEmpty[i] = true;
+            isEmpty = true;
             continue
           }
           selectedContent[i] = selectedContent[i].substring(0, left - selectionStartCol).concat(style.leftStyle).concat(formatable)
         }
       }
-    applyLeft = false
+      if (!isEmpty) {lastNonEmptyIndex = i}
+      applyLeft = false
     } /* end for loop over all lines of selectedContent indexed by i */
 
     for (let i=0; i<selectedContent.length; i++) {
-      if (applyRightArray[i] && !isFormatEmpty[i]) {
+      if (applyRightArray[i]) {
         selectedContent[i] = selectedContent[i].concat(style.rightStyle)
       }
     }
