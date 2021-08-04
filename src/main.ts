@@ -88,288 +88,11 @@ export default class MultilineFormattingPlugin extends Plugin {
     const doc = mdView.editor;
     const cache = this.app.metadataCache.getCache(mdView.file.path)
     const sections = cache.sections;
-
     const formatter = new Formatter(style)
 
     formatter.formatSelection(doc, sections)
 
   }
-
-
-    
-  //   const listItems = cache.listItems
-    
-  //   const selectedText = doc.getSelection()
-  //   const selectedLines = selectedText.split('\n')
-  //   if(selectedLines.length <= 0) { 
-  //     return 
-  //   }
-
-  //   const selectionStartCursor = doc.getCursor('from');
-
-  //   /* If nothing is selected, simply add both sides of the formatting 
-  //     and stick the cursor between them */
-  //   console.debug('empty selection', selectedLines.length == 1, selectedLines[0] === "")
-  //   if (selectedText === ""){
-  //     console.debug('Empty selection')
-  //     doc.replaceSelection(style.leftStyle + style.rightStyle);
-  //     doc.setCursor(selectionStartCursor.line, selectionStartCursor.ch + style.leftStyle.length)
-  //     return
-  //   }
-
-  //   console.debug('Sections', sections)
-  //   console.debug('ListItems', listItems)
-  //   console.debug('Original selectedContent:', selectedLines)
-
-  //   /* If there is no text in the line to format (empty line or only heading/list
-  //      prefix) then we don't want to append the rightStyle after the fact*/
-  //   // let lastNonEmptyIndex: number = -1
-
-  //     /* We're going to apply the rightStyle at the very end because sometimes
-  //   headers close a block unexpectedly, in which case have to look to the block
-  //   preceding and apply the rightStyle after the initial loop through.
-  //   applyRightArray[i] == true means we apply rightStyle to selectedContent[i] */
-  //   // let closeTagPosition: number = -1;
-  //   // const applyRightArray: boolean[] = new Array(selectedContent.length)
-  //   // applyRightArray.fill(false);
-    
-  //   /* The next (non-empty) line after a heading embedded in a list needs 
-  //     leftStyle applied. */
-  //   // let isAfterEmbeddedParaBreak = false
-
-  //   // let previousBlockquoteLevel = 0;
-
-  //   let currentSectionIndex = sectionBinarySearch(selectionStartCursor.line, sections);
-
-  //   for (let i=0; i < selectedLines.length; i++) {
-  //     console.debug('Starting line', i, 'now, with content:', selectedLines[i])
-  //     /* Reset applyLeft to false after each iteration. This variable lets us set
-  //     a 'left' edge between a heading/list prefix, and only apply formatting to
-  //     lines where there is selected content to the right of that left edge. */ 
-
-
-
-  //     let applyLeft = false;
-      
-  //     let isEmpty = false
-
-  //     let isBlockEnd = false;
-
-  //     let left = 0;
-
-  //     const selectionStartCol = (i > 0) ? 0 : selectionStartCursor.ch  
-
-  //     const lineNo = i + selectionStartCursor.line
-  //     console.debug("Lineno:", lineNo, "Section:", currentSectionIndex)
-
-  //     const originalLine = doc.getLine(lineNo)
-  //     console.debug("Full line:", originalLine)
-
-  //     const [,preWhitespace, leftTrimmed] = selectedLines[i].match(/^(\s*)(.*)$/)
-  //     if (leftTrimmed === ""){
-  //       isEmpty = true;
-  //       console.debug("empty line")
-  //       /* note: we can't continue because the prefix might matter */
-  //     }
-
-  //     while (sections[currentSectionIndex].position.end.line < lineNo){
-  //       currentSectionIndex++;
-  //     }
-
-  //     if (sections[currentSectionIndex].type === "paragraph") {
-  //       console.debug("paragraph")
-  //       if (!isEmpty){
-  //         if (lastNonEmptyIndex >= 0) {
-  //           // TODO: PULL OUT AND MAKE INTO A METHOD
-  //           applyRight(lastNonEmptyIndex)
-  //           const [, rightTrimmed, endWhitespace] = selectedLines[lastNonEmptyIndex].match(/^(.*?)(\s*)$/)
-  //           selectedLines[lastNonEmptyIndex] = rightTrimmed + style.rightStyle + endWhitespace
-  //         }
-  //         selectedLines[i] = preWhitespace + style.leftStyle + leftTrimmed
-  //         lastNonEmptyIndex = i
-  //         /* jump to the end of the paragraph */
-  //         i = sections[currentSectionIndex].position.end.line - selectionStartCursor.line
-  //         console.debug('paragraph ends at i:', i)
-  //         continue
-  //       }
-  //     } else if (sections[currentSectionIndex].type === "heading") {
-  //       console.debug("heading");
-  //       if (style.skipHeadings) {
-  //         isEmpty = true;
-  //         console.debug('skipping Heading')
-  //         continue
-  //       } 
-  //       processHeading()
-  //       // const text = headings[sectionBinarySearch(lineNo, headings)].heading
-  //       // console.debug(text)
-  //       // left = originalLine.lastIndexOf(text)
-  //       // if (left > 0) applyLeft = true;
-  //       // console.debug('left in heading:', left)
-  //       // applyRightArray[i] = true
-  //     } else if (sections[currentSectionIndex].type === "blockquote") {
-  //       console.debug("blockquote")
-  //       if (style.skipBlockquotes) {
-  //         isEmpty = true;
-  //         console.debug('skipping Blockquote')
-  //         continue
-  //       }
-  //       processBlockquote()
-  //       /* The prefix for a blockquote is some combination of whitespace and >*/
-  //       const [,prefix,text] = originalLine.match(/^([\s>]*)(.*)/)
-  //       const blockquoteLevel = prefix.split('>').length-1
-  //       console.debug('bq-level:', blockquoteLevel, 'previous:', previousBlockquoteLevel)
-        
-  //       if (previousBlockquoteLevel < blockquoteLevel) {
-  //         applyLeft = true
-  //         if (lastNonEmptyIndex >= 0) {applyRightArray[lastNonEmptyIndex] = true}
-  //         previousBlockquoteLevel = blockquoteLevel
-  //       } 
- 
-  //       if (text === "") {
-  //         isEmpty = true
-  //         if (lastNonEmptyIndex >= 0) {applyRightArray[lastNonEmptyIndex] = true}
-  //         isAfterEmbeddedParaBreak = true
-  //       }
-
-  //       /* if this is the first line of the Blockquote */
-  //       if ((sections[currentSectionIndex].position.start.line == lineNo || isAfterEmbeddedParaBreak) && !isEmpty) {
-  //         applyLeft = true
-  //         console.debug('Applying left because this is the first line')
-  //         isAfterEmbeddedParaBreak = false
-  //       }
-  //       left = prefix.length
-  //       console.debug('left after removing prefix:', left)
-  //       if (sections[currentSectionIndex].position.end.line == lineNo) {
-  //         if (isEmpty){
-  //           if (lastNonEmptyIndex >= 0) {applyRightArray[lastNonEmptyIndex] = true}
-  //         } else applyRightArray[i] = true
-  //       }
-  //     } else if (sections[currentSectionIndex].type === "list") {
-  //       console.debug("list")
-  //       if (style.skipListItems) {
-  //         isEmpty = true;
-  //         console.debug('skipping List Item')
-  //         continue
-  //       } 
-  //       processList()
-  //       if (isAfterEmbeddedParaBreak) { 
-  //         console.debug("line is after list heading")
-  //         if (!isEmpty) {
-  //           applyLeft = true;
-  //           isAfterEmbeddedParaBreak = false;
-  //         }
-  //       } else applyLeft = false
-
-  //       let listIndex = sectionBinarySearch(lineNo, listItems)
-  //       const lineTrimmed = originalLine
-  //       const listItem = listItems[listIndex]
-  //       console.debug('item ', listIndex, 'found via binary search', listItem)
-  //       /* if this is the first line of the ListItem */
-  //       if (listItem.position.start.line == lineNo){
-  //         applyLeft = true
-  //         while (listItems[listIndex].position.start.col > selectionStartCol) {
-  //           console.debug("List item starts in col", listItems[listIndex].position.start.col, " which is to the right of where the selection starts,", selectionStartCol, "so the selection is probably in the preceding list item.")
-  //           listIndex--;
-  //         }
-  //         while (listIndex+1 < listItems.length && listItems[listIndex+1].position.start.line === lineNo && listItems[listIndex+1].position.start.col < selectionStartCol) {
-  //           console.debug("The start of the selected part of this line seems to be after the start of the next list item.")
-  //           console.debug("liststart", listItems[listIndex].position.start.col)
-  //           console.debug("selectionStart", selectionStartCol)
-  //           listIndex++;
-  //         }
-  //         while (true) {
-  //           console.debug('listIndex', listIndex)
-  //           const listItem = listItems[listIndex]
-  //           left = listItems[listIndex].position.start.col
-  //           console.debug('left:', left)
-  //           // let subLine = originalLine.substring(left)
-  //           if (typeof(listItem.task) != 'undefined') {
-  //             /* List item with a task */
-  //             const startUntrimmed = originalLine.substring(left).indexOf(listItem.task.concat(']')) + 2
-  //             left += startUntrimmed
-  //             const subLine = originalLine.substring(left)
-  //             const subLineTrimmed = subLine.trimStart()
-  //             left += subLine.length - subLineTrimmed.length
-  //             console.debug('text,' + subLine)
-  //             console.debug('left,', left)
-  //           } else {
-  //             /* Taskless list items */
-  //             const prefix = originalLine.substring(left).match(/^\s*(\*|-|\d+\.)\s*/)[0]
-  //             console.debug('prefix:', prefix)
-  //             left += prefix.length
-  //             console.debug('left after removing prefix:', left)
-  //           }
-            
-  //           if (listIndex + 1 < listItems.length && listItems[listIndex + 1].position.start.line === lineNo && listItems[listIndex + 1].position.start.col <= left){
-  //             listIndex++;
-  //             console.debug('listIndex', listIndex)
-  //           } else {
-  //             console.debug(lineTrimmed)
-  //             break
-  //           }
-  //         }
-  //       } else {
-  //         console.debug('not first line')
-  //         left = originalLine.length - originalLine.trimStart().length;
-  //       }
-        
-  //       const headingMatch = originalLine.substring(left).match(/^\s*#{1,6}\s+/)
-  //       if (headingMatch != null) {
-  //         console.debug("This is a heading inside a list.")
-  //         applyLeft = true;
-  //         applyRightArray[i] = true;
-  //         if (lastNonEmptyIndex >= 0) applyRightArray[lastNonEmptyIndex] = true;
-  //         isAfterEmbeddedParaBreak = true;
-  //         left += headingMatch[0].length
-  //         console.debug('left', left)
-  //       }
-
-  //       if (listItem.position.end.line === lineNo){
-  //         isBlockEnd = true;
-  //         console.debug("end of listItem")
-  //         if (isEmpty) {
-  //           console.debug("isFormatEmpty")
-  //           if (lastNonEmptyIndex >= 0) {applyRightArray[lastNonEmptyIndex] = true;}
-  //         } else applyRightArray[i] = true
-  //       } else console.debug("Not end of listitem.")
-  
-  //     } else {
-  //       console.debug("not sure what this is", sections[currentSectionIndex].type)
-  //       isEmpty = true
-  //     }
-
-  //     applyRight(lastNonEmptyIndex)
-  //     if (sections[currentSectionIndex].position.end.line === lineNo || i >= selectedLines.length - 1 || isBlockEnd){
-  //       if (lastNonEmptyIndex >= 0) applyRightArray[lastNonEmptyIndex] = true
-  //     }
-
-  //     console.debug("Time to applyLeft")
-  //     if (applyLeft) {
-  //       console.debug('left at application:', left)
-  //       if (left <= selectionStartCol) {
-  //         selectedLines[i] = style.leftStyle.concat(selectedLines[i])
-  //       } else {
-  //         const formatable = selectedLines[i].substring(left - selectionStartCol)
-  //         if (formatable === "") {
-  //           isEmpty = true;
-  //           continue
-  //         }
-  //         selectedLines[i] = selectedLines[i].substring(0, left - selectionStartCol).concat(style.leftStyle).concat(formatable)
-  //       }
-  //     }
-  //     if (!isEmpty) {lastNonEmptyIndex = i}
-  //     applyLeft = false
-  //   } /* end for loop over all lines of selectedContent indexed by i */
-
-  //   // for (let i=0; i<selectedContent.length; i++) {
-  //   //   if (applyRightArray[i]) {
-  //   //     selectedContent[i] = selectedContent[i].concat(style.rightStyle)
-  //   //   }
-  //   // }
-
-  //   doc.replaceSelection(selectedLines.join('\n'));
-
-  // }
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -641,70 +364,12 @@ class Formatter {
     if (desc === 'code') {
       return line.substring(startCol, endCol);
     } 
-    const processor = ({heading: this.processHeading, 
-      blockquote: this.processBlockquote,
-      list: this.processList,
-      paragraph: this.processParagraph
-    })[desc] 
 
-    return prefix.substring(startCol, endCol) + processor.call(this, remainder, startCol - prefix.length, endCol - prefix.length)
+    return prefix.substring(startCol, endCol) + this[desc](remainder, startCol - prefix.length, endCol - prefix.length)
 
-
-    // else if (sectionType === 'paragraph') {
-
-    //   const [, prefix, remainder] = line.match(LEFT_TRIM_REGEX)
-    //   this.replacement.push(prefix.substring(startCol) + this.processParagraph(remainder, startCol - prefix.length))
-
-    // }
-    // else if (sectionType === 'heading') {
-
-    //   const match = line.match(HEADING_REGEX)
-    //   if (match != null) {
-    //     const prefix = match[1]
-    //     const remainder = match[2]
-    //     this.replacement.push(prefix.substring(startCol) + this.processHeading(remainder, startCol - prefix.length))
-    //   }
-    //   console.debug("Uh oh, no headingMatch in a heading section.")
-
-    // }
-    // else if (sectionType === 'blockquote') {
-
-    //   const match = line.match(BLOCKQUOTE_REGEX)
-    //   if (match != null) {
-    //     const prefix = match[1]
-    //     const remainder = match[2]
-    //     this.blockquoteLevelSoFar = 1
-    //     this.replacement.push(prefix.substring(startCol) + this.processBlockquote(remainder, startCol - prefix.length))
-    //   }
-    //   else {
-    //     const [, prefix, remainder] = line.match(LEFT_TRIM_REGEX)
-    //     this.replacement.push(prefix.substring(startCol) + this.processParagraph(remainder, startCol - prefix.length))
-    //     console.debug("No blockquoteMatch in a blockquote section.")
-    //   }
-    // }
-    // else if (sectionType === 'list') {
-    //   const match = line.match(LIST_REGEX)
-    //   if (match != null) {
-    //     const prefix = match[1]
-    //     const remainder = match[4]
-    //     console.debug('outer Prefix:', prefix, "remainder:", remainder, "match:", match)
-    //     this.replacement.push(prefix.substring(startCol) + this.processRemainder(remainder, startCol - prefix.length))
-    //   }
-    //   else {
-    //     const [, prefix, remainder] = line.match(LEFT_TRIM_REGEX)
-    //     this.replacement.push(prefix.substring(startCol) + this.processParagraph(remainder, startCol - prefix.length))
-    //     console.debug("No blockquoteMatch in a blockquote section.")
-    //   }
-    // } 
-    // else {
-    //   console.debug("Unexpectedly no match to any section type:", sectionType.type)
-    //   this.replacement.push(line)
-    // }
   }
 
-
-
-  processBlockquote(remainder: string, startCh: number, endCh: number): string {
+  blockquote(remainder: string, startCh: number, endCh: number): string {
 
     console.debug('bq-level:', this.blockquoteLevelSoFar, 'previous:', this.previousBlockquoteLevel)
 
@@ -717,34 +382,7 @@ class Formatter {
     return this.processRemainder(remainder, startCh, endCh)
   }
 
-  //   const blockquoteMatch = remainder.match(BLOCKQUOTE_REGEX)
-  //   if (blockquoteMatch != null) {
-  //     const prefix = blockquoteMatch[1]
-  //     const remainder = blockquoteMatch[2]
-  //     this.blockquoteLevelSoFar += 1
-  //     return prefix.substring(startCh) + this.processBlockquote(remainder, startCh - prefix.length)
-  //   }
-
-  //   const listMatch = remainder.match(LIST_REGEX)
-  //   if (listMatch != null) {
-  //     const prefix = listMatch[1]
-  //     const remainder = listMatch[4]
-  //     console.debug('inner Prefix:', prefix, "remainder:", remainder, "match:", listMatch)
-  //     return prefix.substring(startCh) + this.processRemainder(remainder, startCh - prefix.length)
-  //   }
-
-  //   const headingMatch = remainder.match(HEADING_REGEX);
-  //   if (headingMatch != null) {
-  //     const prefix = headingMatch[1]
-  //     const remainder = headingMatch[2]
-  //     return prefix.substring(startCh) + this.processHeading(remainder, startCh - prefix.length)
-  //   }
-
-  //   const [,prefix, leftTrimmed] = remainder.match(LEFT_TRIM_REGEX)
-  //   return prefix.substring(startCh) + this.processParagraph(leftTrimmed, startCh - prefix.length)
-  // }
-
-  processHeading(remainder: string, startCh: number, endCh: number) {
+  heading(remainder: string, startCh: number, endCh: number) {
     
     const selectedRemainder = remainder.substring(startCh, endCh)
 
@@ -762,13 +400,13 @@ class Formatter {
     }
   }
 
-  processList(remainder: string, startCh: number, endCh: number): string {
+  list(remainder: string, startCh: number, endCh: number): string {
     this.isPrecededByParagraphBreak = true
 
     return this.processRemainder(remainder, startCh, endCh)
   }
 
-  processParagraph(remainder: string, startCh: number, endCh: number): string {
+  paragraph(remainder: string, startCh: number, endCh: number): string {
     if (remainder == ""){
       this.isPrecededByParagraphBreak = true;
       this.previousBlockquoteLevel = this.blockquoteLevelSoFar
