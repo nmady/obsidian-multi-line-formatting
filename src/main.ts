@@ -1,9 +1,6 @@
 import { 
-  App, Plugin, PluginSettingTab, Setting, MarkdownView, CacheItem, SectionCache, stringifyYaml, Editor
+  App, Plugin, PluginSettingTab, Setting, MarkdownView, CacheItem, SectionCache, Editor
 } from 'obsidian';
-import { start } from 'repl';
-import { threadId } from 'worker_threads';
-import NRDoc from './doc';
 
 const PLUGIN_NAME = "Multi-line Formatting"
 
