@@ -284,10 +284,10 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
 
 type SectionType = 'paragraph' | 'heading' | 'list' | 'blockquote' | 'code'; 
 
-const HEADING_REGEX = /^(\s*#{1,6}\s+)(.*)$/;
-const BLOCKQUOTE_REGEX = /^(\s*>\s*)(.*)$/
-const LIST_REGEX = /^(\s*(\*|-|\d+\.)\s+(\[.\]\s+)?)(.*)$/
-const LEFT_TRIM_REGEX = /^(\s*)(.*)$/
+const HEADING_REGEX = /^(?<prefix>\s*#{1,6}\s+)(?<remainder>.*)$/;
+const BLOCKQUOTE_REGEX = /^(?<prefix>\s*>\s*)(?<remainder>.*)$/
+const LIST_REGEX = /^(?<prefix>\s*(\*|-|\d+\.)\s+(\[.\]\s+)?)(?<remainder>.*)$/
+const LEFT_TRIM_REGEX = /^(?<prefix>\s*)(?<remainder>.*)$/
 const WHITESPACE_ONLY_REGEX = /^\s*$/
 
 class Formatter {
@@ -329,9 +329,11 @@ class Formatter {
       const startCol = lineNum == start.line ? start.ch : 0
       const endCol = lineNum == end.line ? end.ch : line.length
       const parsedLineType = getLineType(line)
-      const lineType = (sections[currentSectionIndex].type == 'code') ? {desc: 'code' as SectionType, prefix: "", remainder: line} : parsedLineType
+      if (sections[currentSectionIndex].type == 'code') {
+        parsedLineType.desc = 'code'
+      }
       
-      this.replacement.push(this.processLine(line, startCol, endCol, lineType))
+      this.replacement.push(this.processLine(line, startCol, endCol, parsedLineType))
 
     }
 
@@ -452,21 +454,23 @@ interface LineType {
 function getLineType(line: string): LineType {
   const headingMatch = line.match(HEADING_REGEX)
   if (headingMatch != null) {
+    
     console.debug('HeadingMatch:', headingMatch)
-    const [, prefix, remainder] = headingMatch
+    
+    const {prefix, remainder} = headingMatch.groups
     return {desc: 'heading', prefix, remainder}
   }
   const listMatch = line.match(LIST_REGEX)
   if (listMatch != null) {
-    const [, prefix, , , remainder] = listMatch
+    const {prefix, remainder} = listMatch.groups
     return {desc: 'list', prefix, remainder}
   }
   const blockquoteMatch = line.match(BLOCKQUOTE_REGEX)
   if (blockquoteMatch != null) {
-    const [, prefix, remainder] = blockquoteMatch
+    const {prefix, remainder} = blockquoteMatch.groups
     return {desc: 'blockquote', prefix, remainder}
   }
-  const [, prefix, remainder] = line.match(LEFT_TRIM_REGEX)
+  const {prefix, remainder} = line.match(LEFT_TRIM_REGEX).groups
   return {desc: 'paragraph', prefix, remainder}
 
 }
