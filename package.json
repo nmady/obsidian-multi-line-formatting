@@ -1,7 +1,7 @@
 {
   "name": "multi-line-formatting",
   "author": "nmady",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Apply formatting to selected text, dealing with the paragraph breaks.",
   "main": "main.js",
   "scripts": {
@@ -18,6 +18,7 @@
     "@rollup/plugin-typescript": "^8.2.1",
     "@types/node": "^14.14.41",
     "obsidian": "^0.12.0",
+    "prettier": "^2.3.2",
     "rollup": "^2.45.2",
     "tslib": "2.2.0",
     "typescript": "^4.2.4"
