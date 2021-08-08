@@ -1,3 +1,4 @@
+import { SSL_OP_SSLEAY_080_CLIENT_DH_BUG } from "constants";
 import {
   App,
   Plugin,
@@ -8,6 +9,7 @@ import {
   SectionCache,
   Editor,
 } from "obsidian";
+import { start } from "repl";
 
 const PLUGIN_NAME = "Multi-line Formatting";
 
@@ -79,14 +81,11 @@ export default class MultilineFormattingPlugin extends Plugin {
 
   formatSelection(
     editor: Editor,
-    view: MarkdownView,
     style: MultilineFormattingStyleSettings
   ): void {
-    const cache = this.app.metadataCache.getCache(view.file.path);
-    const sections = cache.sections;
     const formatter = new Formatter(style);
 
-    formatter.formatSelection(editor, sections);
+    formatter.formatSelection(editor);
   }
 
   async loadSettings() {
@@ -102,7 +101,7 @@ export default class MultilineFormattingPlugin extends Plugin {
       id: style.id,
       name: style.nickname,
       editorCallback: async (editor: Editor, view: MarkdownView) => {
-        this.formatSelection(editor, view, style);
+        this.formatSelection(editor, style);
       },
     });
   }
@@ -288,11 +287,22 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
   }
 }
 
-type SectionType = "paragraph" | "heading" | "list" | "blockquote" | "code";
+type SectionType =
+  | "paragraph"
+  | "heading"
+  | "list"
+  | "blockquote"
+  | "fence"
+  | "indent";
 
-const HEADING_REGEX = /^(?<prefix>\s*#{1,6}\s+)(?<remainder>.*)$/;
-const BLOCKQUOTE_REGEX = /^(?<prefix>\s*>\s*)(?<remainder>.*)$/;
-const LIST_REGEX = /^(?<prefix>\s*(\*|-|\d+\.)\s+(\[.\]\s+)?)(?<remainder>.*)$/;
+const HEADING_REGEX = /^(?<prefix> {0,3}#{1,6}\s+)(?<remainder>.*)$/;
+const BLOCKQUOTE_REGEX = /^(?<prefix> {0,3}>\s*)(?<remainder>.*)$/;
+const LIST_REGEX =
+  /^(?<prefix> {0,3}(\*|-|\d+\.)\s+(\[.\]\s+)?)(?<remainder>.*)$/;
+const CODE_INDENT_REGEX = /^(?<prefix> {4}|\t)(?<remainder>.*)$/;
+const CODE_FENCE_OPEN_REGEX = /^(?<prefix> {0,3}(`{3}|~{3}))(?<remainder>.*)$/;
+const CODE_FENCE_CLOSE_REGEX =
+  /^(?<prefix> {0,3}(`{3}|~{3}))(?<remainder>\s*)$/;
 const LEFT_TRIM_REGEX = /^(?<prefix>\s*)(?<remainder>.*)$/;
 const WHITESPACE_ONLY_REGEX = /^\s*$/;
 
@@ -303,6 +313,9 @@ class Formatter {
   isPrecededByParagraphBreak: boolean;
   previousBlockquoteLevel: number;
   blockquoteLevelSoFar: number;
+  previousListLevel: number;
+  listLevelSoFar: number;
+  fenceOpen: boolean;
 
   constructor(style: MultilineFormattingStyleSettings) {
     this.replacement = [];
@@ -311,9 +324,12 @@ class Formatter {
     this.isPrecededByParagraphBreak = true;
     this.previousBlockquoteLevel = 0;
     this.blockquoteLevelSoFar = 0;
+    this.previousListLevel = 0;
+    this.listLevelSoFar = 0;
+    this.fenceOpen = false;
   }
 
-  formatSelection(doc: Editor, sections: SectionCache[]): void {
+  formatSelection(doc: Editor): void {
     const start = doc.getCursor("from");
     const end = doc.getCursor("to");
 
@@ -323,21 +339,26 @@ class Formatter {
       return;
     }
 
-    for (let lineNum = start.line; lineNum <= end.line; lineNum++) {
-      const currentSectionIndex = sectionBinarySearch(lineNum, sections);
+    for (let lineNum = 0; lineNum <= end.line; lineNum++) {
       const line = doc.getLine(lineNum);
+      console.debug(line);
       this.blockquoteLevelSoFar = 0;
 
-      const startCol = lineNum == start.line ? start.ch : 0;
-      const endCol = lineNum == end.line ? end.ch : line.length;
-      const parsedLineType = getLineType(line);
-      if (sections[currentSectionIndex].type == "code") {
-        parsedLineType.desc = "code";
-      }
+      const startCh = lineNum == start.line ? start.ch : 0;
+      const endCh = lineNum == end.line ? end.ch : line.length;
 
-      this.replacement.push(
-        this.processLine(line, startCol, endCol, parsedLineType)
+      const parsedLineType = getLineType(line);
+      const formattedLine = this.processLine(
+        line,
+        startCh,
+        endCh,
+        parsedLineType
       );
+
+      if (lineNum >= start.line) {
+        console.debug("Formatting", line);
+        this.replacement.push(formattedLine);
+      }
     }
 
     this.applyRightAbove();
@@ -350,6 +371,17 @@ class Formatter {
   }
 
   processRemainder(remainder: string, startCh: number, endCh: number): string {
+    // if (this.fenceOpen) {
+    //   console.debug("fenceOpen is true");
+    //   const fenceMatch = remainder.match(CODE_FENCE_CLOSE_REGEX);
+    //   console.debug("fenceMatch: ", fenceMatch, "remain:", remainder);
+    //   if (fenceMatch != null) {
+    //     console.debug("closing fence");
+    //     this.fenceOpen = false;
+    //   }
+    //   return remainder.substring(startCh, endCh);
+    // }
+
     const lineType = getLineType(remainder);
     return this.processLine(remainder, startCh, endCh, lineType);
   }
@@ -366,8 +398,8 @@ class Formatter {
       this.blockquoteLevelSoFar += 1;
     }
 
-    if (desc === "code") {
-      return line.substring(startCol, endCol);
+    if (desc === "list") {
+      this.listLevelSoFar += 1;
     }
 
     return (
@@ -384,6 +416,14 @@ class Formatter {
       this.previousBlockquoteLevel
     );
 
+    if (
+      this.fenceOpen &&
+      this.previousBlockquoteLevel == this.blockquoteLevelSoFar
+    ) {
+      console.debug("applying paragraph to", remainder);
+      return this.paragraph(remainder, startCh, endCh);
+    }
+
     if (this.previousBlockquoteLevel < this.blockquoteLevelSoFar) {
       this.isPrecededByParagraphBreak = true;
       this.applyRightAbove();
@@ -394,9 +434,10 @@ class Formatter {
   }
 
   heading(remainder: string, startCh: number, endCh: number) {
+    console.debug("This is a heading");
+
     const selectedRemainder = remainder.substring(startCh, endCh);
 
-    console.debug("This is a heading");
     this.applyRightAbove();
 
     this.isPrecededByParagraphBreak = true;
@@ -421,10 +462,15 @@ class Formatter {
   paragraph(remainder: string, startCh: number, endCh: number): string {
     if (remainder == "") {
       this.isPrecededByParagraphBreak = true;
+      if (this.fenceOpen && this.previousBlockquoteLevel > 0) {
+        console.debug("Closing fence");
+        this.fenceOpen = false;
+      }
       this.previousBlockquoteLevel = this.blockquoteLevelSoFar;
       return remainder;
     } else if (
-      remainder.substring(startCh, endCh).search(WHITESPACE_ONLY_REGEX) >= 0
+      remainder.substring(startCh, endCh).search(WHITESPACE_ONLY_REGEX) >= 0 ||
+      this.fenceOpen
     ) {
       return remainder.substring(startCh, endCh);
     } else {
@@ -439,6 +485,31 @@ class Formatter {
 
       this.setCurrentLineNonEmpty();
       return returnable;
+    }
+  }
+
+  fence(remainder: string, startCh: number, endCh: number): string {
+    if (this.fenceOpen && remainder.match(WHITESPACE_ONLY_REGEX)) {
+      console.debug("closing fence");
+      this.fenceOpen = false;
+      this.isPrecededByParagraphBreak = true;
+    } else {
+      console.debug("opening fence");
+      this.fenceOpen = true;
+    }
+    return remainder.substring(startCh, endCh);
+  }
+
+  indent(remainder: string, startCh: number, endCh: number): string {
+    const { prefix, trimmed } = remainder.match(LEFT_TRIM_REGEX).groups;
+    if (!this.isPrecededByParagraphBreak || trimmed == "") {
+      return this.paragraph(
+        trimmed,
+        startCh - prefix.length,
+        endCh - prefix.length
+      );
+    } else {
+      return remainder.substring(startCh, endCh);
     }
   }
 
@@ -465,10 +536,13 @@ interface LineType {
 }
 
 function getLineType(line: string): LineType {
+  const indentMatch = line.match(CODE_INDENT_REGEX);
+  if (indentMatch != null) {
+    const { prefix, remainder } = indentMatch.groups;
+    return { desc: "indent", prefix, remainder };
+  }
   const headingMatch = line.match(HEADING_REGEX);
   if (headingMatch != null) {
-    console.debug("HeadingMatch:", headingMatch);
-
     const { prefix, remainder } = headingMatch.groups;
     return { desc: "heading", prefix, remainder };
   }
@@ -481,6 +555,12 @@ function getLineType(line: string): LineType {
   if (blockquoteMatch != null) {
     const { prefix, remainder } = blockquoteMatch.groups;
     return { desc: "blockquote", prefix, remainder };
+  }
+  const fenceMatch = line.match(CODE_FENCE_OPEN_REGEX);
+  if (fenceMatch != null) {
+    const { prefix, remainder } = fenceMatch.groups;
+    console.debug("fence: '" + prefix + "', '" + remainder + "'");
+    return { desc: "fence", prefix, remainder };
   }
   const { prefix, remainder } = line.match(LEFT_TRIM_REGEX).groups;
   return { desc: "paragraph", prefix, remainder };
