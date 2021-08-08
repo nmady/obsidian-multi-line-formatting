@@ -1,4 +1,4 @@
-## Obsidian Multi-line Formatting Plugin 
+## Obsidian Multi-line Formatting Plugin
 
 This plugin is designed to offer formatting over an entire selection, even if that selection has paragraph breaks in the middle! However, this plugin is new and has only had limited testing. I am grateful for your patience and your bug reports!
 
@@ -22,12 +22,11 @@ Like any other Obsidian commands, you can assign hotkeys to the formatting style
 
 ## Limitations
 
-Again, this is an early version of this plugin which has had limited testing. Help me improve it by reporting any unexpected behaviour. However, note that currently code block sections are skipped, but code blocks embedded in list items or blockquotes are not formatted correctly. 
+Again, this is an early version of this plugin which has had limited testing. Help me improve it by reporting any unexpected behaviour.
 
-### Planned Features
+### Codeblocks
 
-- Jump to formattable part of the line if you apply the command with an empty selection 
-- Handle embedded code blocks
+However, this plugin is **not** designed to work with codeblocks. In most cases, codeblock sections will be skipped, but formatting applied to codeblocks and any sections near codeblocks may not be formatted appropriately since skipping relies on the `MetadataCache`, which may not be up to date. Further, the behaviour when selections include code blocks embedded in list items or blockquotes will likely not be as desired (essentially, dealing with embedded code blocks has not been implemented).
 
 ## Bug reports and feature requests appreciated!
 
