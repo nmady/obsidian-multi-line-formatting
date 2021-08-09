@@ -293,7 +293,7 @@ type SectionType = "paragraph" | "heading" | "list" | "blockquote" | "code";
 const HEADING_REGEX = /^(?<prefix>\s*#{1,6}\s+)(?<remainder>.*)$/;
 const BLOCKQUOTE_REGEX = /^(?<prefix>\s*>\s*)(?<remainder>.*)$/;
 const LIST_REGEX =
-  /^(?<prefix>\s*(\*|\+|-|\d+\.)\s+(\[.\]\s+)?)(?<remainder>.*)$/;
+  /^(?<prefix>\s*(\*|\+|-|\d+\.|\d+\))\s+(\[.\]\s+)?)(?<remainder>.*)$/;
 const LEFT_TRIM_REGEX = /^(?<prefix>\s*)(?<remainder>.*)$/;
 const WHITESPACE_ONLY_REGEX = /^\s*$/;
 
