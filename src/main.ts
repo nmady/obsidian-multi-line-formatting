@@ -298,7 +298,7 @@ type SectionType =
 const HEADING_REGEX = /^(?<prefix> {0,3}#{1,6}\s+)(?<remainder>.*)$/;
 const BLOCKQUOTE_REGEX = /^(?<prefix> {0,3}>\s*)(?<remainder>.*)$/;
 const LIST_REGEX =
-  /^(?<prefix> {0,3}(\*|-|\d+\.)\s+(\[.\]\s+)?)(?<remainder>.*)$/;
+  /^(?<prefix>\s*(\*|\+|-|\d+\.|\d+\))\s+(\[.\]\s+)?)(?<remainder>.*)$/;
 const CODE_INDENT_REGEX = /^(?<prefix> {4}|\t)(?<remainder>.*)$/;
 const CODE_FENCE_OPEN_REGEX = /^(?<prefix> {0,3}(`{3}|~{3}))(?<remainder>.*)$/;
 const CODE_FENCE_CLOSE_REGEX =
@@ -313,8 +313,7 @@ class Formatter {
   isPrecededByParagraphBreak: boolean;
   previousBlockquoteLevel: number;
   blockquoteLevelSoFar: number;
-  previousListLevel: number;
-  listLevelSoFar: number;
+  listLevel: number[];
   fenceOpen: boolean;
 
   constructor(style: MultilineFormattingStyleSettings) {
@@ -324,8 +323,7 @@ class Formatter {
     this.isPrecededByParagraphBreak = true;
     this.previousBlockquoteLevel = 0;
     this.blockquoteLevelSoFar = 0;
-    this.previousListLevel = 0;
-    this.listLevelSoFar = 0;
+    this.listLevel = [];
     this.fenceOpen = false;
   }
 
@@ -399,7 +397,16 @@ class Formatter {
     }
 
     if (desc === "list") {
-      this.listLevelSoFar += 1;
+      const { marker, whitespace } = prefix.match(
+        /^(?<marker>.*?)(?<whitespace>\s*)$/
+      ).groups;
+      const expanded = whitespace.replace("\t", "    ");
+      const numspaces = expanded.split(" ").length - 1;
+      if (numspaces < 5) {
+        this.listLevel.push(marker.length + numspaces);
+      } else {
+        this.listLevel.push(marker.length + 1);
+      }
     }
 
     return (
