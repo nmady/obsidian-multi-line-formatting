@@ -101,7 +101,7 @@ export default class MultilineFormattingPlugin extends Plugin {
     this.addCommand({
       id: style.id,
       name: style.nickname,
-      editorCallback: async (editor: Editor, view: MarkdownView) => {
+      editorCallback: (editor: Editor, view: MarkdownView) => {
         this.formatSelection(editor, view, style);
       },
     });

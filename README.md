@@ -34,4 +34,4 @@ Please let me know how this plugin can be improved.
 
 ### Acknowledgements
 
-A huge thank you to **lynchjames**, whose [Note Refactor Plugin](https://github.com/lynchjames/note-refactor-obsidian) formed the base for this plugin, and to **THeK3nger** for the [Obsidian Plugin Template](https://github.com/THeK3nger/obsidian-plugin-template), and to [roshanshariff](https://github.com/roshanshariff) for help debugging and refactoring!
+A huge thank you to **lynchjames**, whose [Note Refactor Plugin](https://github.com/lynchjames/note-refactor-obsidian) formed the base for this plugin, to **THeK3nger** for the [Obsidian Plugin Template](https://github.com/THeK3nger/obsidian-plugin-template), to [Lishid](https://github.com/lishid) for a helpful code review, and to [roshanshariff](https://github.com/roshanshariff) for help debugging and refactoring!
