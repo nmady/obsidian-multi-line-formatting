@@ -1,3 +1,4 @@
+import { debug } from "console";
 import {
   App,
   Plugin,
@@ -318,7 +319,7 @@ class Formatter {
     const start = doc.getCursor("from");
     const end = doc.getCursor("to");
 
-    if (start === end) {
+    if (start.ch == end.ch && start.line == end.line) {
       doc.replaceSelection(this.style.leftStyle + this.style.rightStyle);
       doc.setCursor(start.line, start.ch + this.style.leftStyle.length);
       return;
