@@ -24,6 +24,7 @@ interface MultilineFormattingStyleSettings {
   skipHeadings: boolean;
   skipListItems: boolean;
   skipBlockquotes: boolean;
+  formatWord: boolean;
 }
 
 const DEFAULT_SETTINGS: MultilineFormattingPluginSettings = {
@@ -36,6 +37,7 @@ const DEFAULT_SETTINGS: MultilineFormattingPluginSettings = {
       skipHeadings: false,
       skipListItems: false,
       skipBlockquotes: false,
+      formatWord: false,
     },
     {
       id: "multi-line-format-bold",
@@ -45,6 +47,7 @@ const DEFAULT_SETTINGS: MultilineFormattingPluginSettings = {
       skipHeadings: false,
       skipListItems: false,
       skipBlockquotes: false,
+      formatWord: false,
     },
   ],
 };
@@ -57,6 +60,7 @@ const NEW_STYLE_DEFAULTS: MultilineFormattingStyleSettings = {
   skipHeadings: false,
   skipListItems: false,
   skipBlockquotes: false,
+  formatWord: false,
 };
 
 export default class MultilineFormattingPlugin extends Plugin {
@@ -262,6 +266,19 @@ class MultilineFormattingSettingTab extends PluginSettingTab {
         });
       });
 
+    new Setting(containerEl)
+      .setName("Format word if selection is empty")
+      .setDesc(
+        "Turn this toggle ON if you want the command to format the word that the cursor is touching when nothing is selected."
+      )
+      .addToggle((t) => {
+        t.setValue(style.formatWord);
+        t.onChange(async (v) => {
+          style.formatWord = v;
+          await this.plugin.saveSettings();
+        });
+      });
+
     // new Setting(skipDetails)
     //     .setName('Skip Blockquotes')
     //     .setDesc('Turn this toggle ON to exclude text in blockquotes.')
@@ -320,9 +337,24 @@ class Formatter {
     const end = doc.getCursor("to");
 
     if (start.ch == end.ch && start.line == end.line) {
-      doc.replaceSelection(this.style.leftStyle + this.style.rightStyle);
-      doc.setCursor(start.line, start.ch + this.style.leftStyle.length);
-      return;
+      const line = doc.getLine(end.line);
+      if (!this.style.formatWord) {
+        doc.replaceSelection(this.style.leftStyle + this.style.rightStyle);
+        doc.setCursor(start.line, start.ch + this.style.leftStyle.length);
+        return;
+      } else {
+        const left = line.substring(0, end.ch).match(/\S*$/);
+        const right = line.substring(end.ch).match(/^\S*/);
+        const replacementLine =
+          line.substring(0, left["index"]) +
+          this.style.leftStyle +
+          left[0] +
+          right[0] +
+          this.style.rightStyle +
+          line.substring(end.ch + right[0].length);
+        doc.setLine(end.line, replacementLine);
+        doc.setCursor(end.line, end.ch + this.style.leftStyle.length);
+      }
     }
 
     for (let lineNum = start.line; lineNum <= end.line; lineNum++) {
