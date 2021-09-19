@@ -14,6 +14,8 @@ For each formatting style, you can enter the formatting you want to apply as **L
 
 If you want to be able to select large amounts of text but not apply your formatting style to headings in that selection you can toggle **Skip Headings** on.
 
+Toggling **Format word if selection is empty** on means that if no text is selected but the cursor is touching or inside a word (here defined as non-whitespace), the formatting will appear around the word, rather than just around the cursor, which is what occurs if this setting is toggled off. (This toggle is new to 0.4.0.)
+
 You can delete formatting styles that you are not using by clicking the **Delete this style** button at the bottom of styles settings for any style.
 
 ### Hotkeys
