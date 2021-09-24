@@ -138,7 +138,10 @@ export default class MultilineFormattingPlugin extends Plugin {
 
 function sectionBinarySearch(line: number, sections: CacheItem[]): number {
   let low = 0;
-  let high = sections.length;
+  let high = -1;
+  if (sections) {
+    high = sections.length;
+  }
   while (low < high) {
     const midpoint = low + ((high - low) >> 1);
     const midposition = sections[midpoint].position;
@@ -358,15 +361,18 @@ class Formatter {
     }
 
     for (let lineNum = start.line; lineNum <= end.line; lineNum++) {
-      const currentSectionIndex = sectionBinarySearch(lineNum, sections);
       const line = doc.getLine(lineNum);
       this.blockquoteLevelSoFar = 0;
 
       const startCol = lineNum == start.line ? start.ch : 0;
       const endCol = lineNum == end.line ? end.ch : line.length;
       const parsedLineType = getLineType(line);
-      if (sections[currentSectionIndex].type == "code") {
-        parsedLineType.desc = "code";
+
+      if (sections) {
+        const currentSectionIndex = sectionBinarySearch(lineNum, sections);
+        if (sections[currentSectionIndex].type == "code") {
+          parsedLineType.desc = "code";
+        }
       }
 
       this.replacement.push(
